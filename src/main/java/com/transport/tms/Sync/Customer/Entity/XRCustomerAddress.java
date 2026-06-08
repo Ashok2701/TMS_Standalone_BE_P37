@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Table(name = "xr_customer_address", schema = "tms")
@@ -12,6 +13,7 @@ import java.time.LocalDateTime;
 @Setter
 public class XRCustomerAddress {
 
+    // ── X3 FIELDS (managed by sync, never edit manually) ──────
     @Id
     @Column(name = "address_code")
     private String addressCode;
@@ -63,4 +65,42 @@ public class XRCustomerAddress {
 
     @Column(name = "synced_at")
     private LocalDateTime syncedAt;
+
+    // ── TMS FIELDS (managed via TMS UI, never touched by sync) ─
+    @Column(name = "any_time_window")
+    private Boolean anyTimeWindow = false;      // true = all time windows applicable
+
+    @Column(name = "any_vehicle_category")
+    private Boolean anyVehicleCategory = false; // true = all vehicle categories eligible
+
+    @Column(name = "any_driver")
+    private Boolean anyDriver = false;          // true = all drivers eligible
+
+    @Column(name = "updated_by")
+    private String updatedBy;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    // ── TMS GRID RELATIONS ──────────────────────────────────────
+    @OneToMany(
+            mappedBy = "address",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true,
+            fetch = FetchType.LAZY)
+    private List<XRAddressTimeWindow> timeWindows;
+
+    @OneToMany(
+            mappedBy = "address",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true,
+            fetch = FetchType.LAZY)
+    private List<XRAddressVehicle> vehicles;
+
+    @OneToMany(
+            mappedBy = "address",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true,
+            fetch = FetchType.LAZY)
+    private List<XRAddressDriver> drivers;
 }

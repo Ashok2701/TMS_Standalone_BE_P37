@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 @Setter
 public class XRProduct {
 
+    // ── X3 FIELDS (managed by sync, never edit manually) ──────
     @Id
     @Column(name = "product_code")
     private String productCode;
@@ -51,4 +52,14 @@ public class XRProduct {
 
     @Column(name = "synced_at")
     private LocalDateTime syncedAt;
+
+    // ── TMS FIELDS (managed via TMS UI, never touched by sync) ─
+    @Column(name = "service_time")
+    private String serviceTime;   // HH:MM
+
+    @Column(name = "updated_by")
+    private String updatedBy;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 }

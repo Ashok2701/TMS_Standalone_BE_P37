@@ -69,8 +69,8 @@ public class PostgresConfig {
                 .packages(
                         "com.transport.tms.Fleet.Entity",
                         "com.transport.tms.Sync.Entity",
-                        "com.transport.tms.Sync.Customer.Entity",
-                        "com.transport.tms.Sync.Product.Entity",
+                        "com.transport.tms.Sync.Customer.Entity",   // XRCustomer, XRCustomerAddress + 3 child grids
+                        "com.transport.tms.Sync.Product.Entity",    // XRProduct
                         "com.transport.tms.UserManagement.Entity",
                         "com.transport.tms.Sync.Site.Entity",
                         "com.transport.tms.Configuration.Document.Entity"
