@@ -19,19 +19,23 @@ public class X3CustomerAddressRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
+    // COUNT must match exactly what findCustomerAddresses() fetches
+    // — all addresses in BPADDRESS that belong to a customer
     public Integer count() {
 
         String sql = """
             SELECT COUNT(*)
-            FROM LEWISB.BPADDRESS
-            WHERE BPANUM_0 IN (
-                SELECT BPCNUM_0 FROM LEWISB.BPCUSTOMER
-            )
+            FROM LEWISB.BPADDRESS A
+            INNER JOIN LEWISB.BPCUSTOMER C
+                ON A.BPANUM_0 = C.BPCNUM_0
         """;
 
         return jdbcTemplate.queryForObject(sql, Integer.class);
     }
 
+    // Fetch ALL addresses for ALL customers
+    // BPADDRESS.BPANUM_0  = the customer code this address belongs to
+    // BPADDRESS.BPAADD_0  = the address code (unique key)
     public List<X3CustomerAddressDTO> findCustomerAddresses() {
 
         String sql = """
@@ -49,10 +53,12 @@ public class X3CustomerAddressRepository {
                 A.CRYNAM_0,
                 A.TEL_0,
                 A.MOB_0,
-                A.WEB_0
-            FROM LEWISB.BPCUSTOMER C
-            JOIN LEWISB.BPADDRESS A
-                ON C.BPAADD_0 = A.BPAADD_0
+                A.WEB_0,
+                CASE WHEN C.BPAADD_0 = A.BPAADD_0 THEN 1 ELSE 0 END AS IS_DEFAULT
+            FROM LEWISB.BPADDRESS A
+            INNER JOIN LEWISB.BPCUSTOMER C
+                ON A.BPANUM_0 = C.BPCNUM_0
+            ORDER BY C.BPCNUM_0, IS_DEFAULT DESC
         """;
 
         return jdbcTemplate.query(
@@ -104,7 +110,9 @@ public class X3CustomerAddressRepository {
                     dto.setWebSite(
                             rs.getString("WEB_0"));
 
-                    dto.setDefaultAddress(true);
+                    // true = this is the customer's primary/default address
+                    dto.setDefaultAddress(
+                            rs.getInt("IS_DEFAULT") == 1);
 
                     return dto;
                 }
