@@ -1,0 +1,106 @@
+package com.transport.tms.Fleet.Dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.util.Date;
+import java.util.List;
+
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+public class FleetVehicleVO {
+
+    private Long rowId;
+    private String code;
+    private String registration;
+    private String site;
+    private int activeFlag;
+    private int ownership;
+    private String vehicleClass;
+    private String carrier;
+    private String trailer;
+    private String startDepotName;
+    private String endDepotName;
+    private int brand;
+    private String model;
+    private int color;
+    private int fuelType;
+    private String location;
+    private int engineCC;
+    private String chasisNum;
+    private int yearOfManufacture;
+    private int performance;
+    private int insuranceAmountYearly;
+    private int roadTaxAmountYearly;
+    private double emptyVehicleMass;
+    private double grossVehicleMass;
+    private double tolerance;
+    private String skillCriteria;
+    private double loadingTime;
+    private double offloadingTime;
+    private String earliestStartTime;
+    private String latestStartTime;
+    private double availableHours;
+    private double costPerUnitOverTime;
+    private double costPerUnitDistance;
+    private double costPerUnitTime;
+    private double fixedCost;
+    private double totalMaxDistance;
+    private double maxTotalTime;
+    private double maxTotalTravelTime;
+    private double maxSpeed;
+    private int overTimeHrs;
+    private double maxAllowedWeight;
+    private double maxAllowedVolume;
+    private double quantity;
+    private int maxOrderCount;
+    private int noOfPallets;
+    private double stackHeight;
+    private double surfaceSol;
+    private double vehicleFuelCapacity;
+    private String vehicleFuelUnits;
+    private String currentDriver;
+    private Date date;
+    private String time;
+    private double co2Coef;
+    private String unavailable;
+    private String style;
+    private List<RouteRenewal> routeRenewalsList;
+    private int allDriverFlag;
+    private List<VehicleTable> driverIds;
+    private int allCustomerFlag;
+    private List<VehicleTable> customerIds;
+    private int allCategoryFlag;
+    private List<VehicleTable> categoryIds;
+    private int currentOdometerReading;
+    private Date lastUpdateDate;
+    private String lastUpdateTime;
+    private String reference;
+    private Date lastInsp;
+    private Date expiryInsp;
+    private String vehicleAllocationInsp;
+    private String returnVehicleInsp;
+    private String gpsTrackerId;
+    private String refGMSmobile;
+    private String trackingWebServices;
+    private String mobileRadio;
+    private String fireExtinguisher;
+    private String equipmentNotes;
+    private List<TechnicalInspection> technicalInspectionList;
+    private String asset;
+    private String licenseReference;
+    private Date expiration;
+    private String note;
+    private String supplier;
+    private Date insuranceExpiration;
+    private String insuranceReference;
+    private String insuranceNote;
+    private List<Document> documentList;
+    private List<TransactionHistory> transactionHistoryList;
+    private byte[] image;
+//    private String image;
+    private int xallrutcds;
+    private List<Integer> routesList;
+}
