@@ -19,13 +19,17 @@ public class CustomerAddressController {
         return repository.findAll();
     }
 
-    @GetMapping("/{addressCode}")
+    // Use /by-customer/{customerCode}/{addressCode} for single address lookup
+    // since PK is now composite (customerCode + addressCode)
+    @GetMapping("/by-customer/{customerCode}/{addressCode}")
     public XRCustomerAddress getById(
+            @PathVariable String customerCode,
             @PathVariable String addressCode) {
 
-        return repository.findById(addressCode)
+        return repository.findByCustomerCodeAndAddressCode(customerCode, addressCode)
                 .orElseThrow(() ->
-                        new RuntimeException("Address not found: " + addressCode));
+                        new RuntimeException(
+                                "Address not found: " + customerCode + "/" + addressCode));
     }
 
     @GetMapping("/by-customer/{customerCode}")
