@@ -20,11 +20,8 @@ public class CustomerManagementService {
     private final AddressVehicleRepository vehicleRepository;
     private final AddressDriverRepository driverRepository;
 
-    // ══════════════════════════════════════════════════════════
-    // LIST — lightweight rows for table view
-    // ══════════════════════════════════════════════════════════
+    // ── LIST ──────────────────────────────────────────────────
     public List<CustomerListDTO> listCustomers() {
-
         return customerRepository.findAll()
                 .stream()
                 .map(c -> {
@@ -40,16 +37,13 @@ public class CustomerManagementService {
                     dto.setServiceTime(c.getServiceTime());
                     dto.setWaitingTime(c.getWaitingTime());
                     dto.setAddressCount(
-                            addressRepository.countByCustomerCode(
-                                    c.getCustomerCode()));
+                            addressRepository.countByCustomerCode(c.getCustomerCode()));
                     return dto;
                 })
                 .toList();
     }
 
-    // ══════════════════════════════════════════════════════════
-    // GET DETAIL — full customer + all addresses + all grids
-    // ══════════════════════════════════════════════════════════
+    // ── GET DETAIL ────────────────────────────────────────────
     public CustomerDetailDTO getCustomerDetail(String customerCode) {
 
         XRCustomer customer = customerRepository.findById(customerCode)
@@ -59,15 +53,13 @@ public class CustomerManagementService {
         List<CustomerAddressDetailDTO> addresses =
                 addressRepository.findByCustomerCode(customerCode)
                         .stream()
-                        .map(this::mapAddressDetail)
+                        .map(a -> mapAddressDetail(a))
                         .toList();
 
         return mapCustomerDetail(customer, addresses);
     }
 
-    // ══════════════════════════════════════════════════════════
-    // UPDATE CUSTOMER TMS FIELDS  (Info tab save)
-    // ══════════════════════════════════════════════════════════
+    // ── UPDATE CUSTOMER TMS FIELDS ────────────────────────────
     @Transactional
     public CustomerDetailDTO updateCustomerTms(String customerCode,
                                                CustomerDetailDTO dto) {
@@ -76,29 +68,43 @@ public class CustomerManagementService {
                 .orElseThrow(() ->
                         new RuntimeException("Customer not found: " + customerCode));
 
-        // Only TMS fields — never touch X3 fields
         customer.setLatitude(dto.getLatitude());
         customer.setLongitude(dto.getLongitude());
         customer.setServiceTime(dto.getServiceTime());
         customer.setWaitingTime(dto.getWaitingTime());
         customer.setUpdatedBy(dto.getUpdatedBy());
         customer.setUpdatedAt(LocalDateTime.now());
-
         customerRepository.save(customer);
 
         return getCustomerDetail(customerCode);
     }
 
-    // ══════════════════════════════════════════════════════════
-    // SAVE ADDRESS TMS FIELDS + GRIDS  (Address tab save)
-    // ══════════════════════════════════════════════════════════
+    // ── GET SINGLE ADDRESS ────────────────────────────────────
+    public CustomerAddressDetailDTO getAddressDetail(String customerCode,
+                                                     String addressCode) {
+
+        XRCustomerAddress address =
+                addressRepository.findByCustomerCodeAndAddressCode(
+                                customerCode, addressCode)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Address not found: " + customerCode + "/" + addressCode));
+
+        return mapAddressDetail(address);
+    }
+
+    // ── SAVE ADDRESS TMS + GRIDS ──────────────────────────────
     @Transactional
-    public CustomerAddressDetailDTO saveAddressTms(String addressCode,
+    public CustomerAddressDetailDTO saveAddressTms(String customerCode,
+                                                   String addressCode,
                                                    CustomerAddressDetailDTO dto) {
 
-        XRCustomerAddress address = addressRepository.findById(addressCode)
-                .orElseThrow(() ->
-                        new RuntimeException("Address not found: " + addressCode));
+        XRCustomerAddress address =
+                addressRepository.findByCustomerCodeAndAddressCode(
+                                customerCode, addressCode)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Address not found: " + customerCode + "/" + addressCode));
 
         // TMS flags
         address.setAnyTimeWindow(dto.getAnyTimeWindow());
@@ -108,8 +114,9 @@ public class CustomerManagementService {
         address.setUpdatedAt(LocalDateTime.now());
         addressRepository.save(address);
 
-        // ── Time windows — replace all ───────────────────────
-        timeWindowRepository.deleteByAddressAddressCode(addressCode);
+        // Time windows — replace all
+        timeWindowRepository.deleteByAddressCustomerCodeAndAddressAddressCode(
+                customerCode, addressCode);
         if (dto.getTimeWindows() != null) {
             int order = 0;
             for (TimeWindowDTO tw : dto.getTimeWindows()) {
@@ -124,8 +131,9 @@ public class CustomerManagementService {
             }
         }
 
-        // ── Vehicle categories — replace all ─────────────────
-        vehicleRepository.deleteByAddressAddressCode(addressCode);
+        // Vehicle categories — replace all
+        vehicleRepository.deleteByAddressCustomerCodeAndAddressAddressCode(
+                customerCode, addressCode);
         if (dto.getVehicles() != null) {
             for (AddressVehicleDTO v : dto.getVehicles()) {
                 XRAddressVehicle e = new XRAddressVehicle();
@@ -137,8 +145,9 @@ public class CustomerManagementService {
             }
         }
 
-        // ── Drivers — replace all ─────────────────────────────
-        driverRepository.deleteByAddressAddressCode(addressCode);
+        // Drivers — replace all
+        driverRepository.deleteByAddressCustomerCodeAndAddressAddressCode(
+                customerCode, addressCode);
         if (dto.getDrivers() != null) {
             for (AddressDriverDTO d : dto.getDrivers()) {
                 XRAddressDriver e = new XRAddressDriver();
@@ -150,25 +159,10 @@ public class CustomerManagementService {
             }
         }
 
-        return mapAddressDetail(
-                addressRepository.findById(addressCode).get());
+        return getAddressDetail(customerCode, addressCode);
     }
 
-    // ══════════════════════════════════════════════════════════
-    // GET SINGLE ADDRESS DETAIL
-    // ══════════════════════════════════════════════════════════
-    public CustomerAddressDetailDTO getAddressDetail(String addressCode) {
-
-        XRCustomerAddress address = addressRepository.findById(addressCode)
-                .orElseThrow(() ->
-                        new RuntimeException("Address not found: " + addressCode));
-
-        return mapAddressDetail(address);
-    }
-
-    // ══════════════════════════════════════════════════════════
-    // MAPPERS
-    // ══════════════════════════════════════════════════════════
+    // ── MAPPERS ───────────────────────────────────────────────
     private CustomerDetailDTO mapCustomerDetail(XRCustomer c,
                                                 List<CustomerAddressDetailDTO> addresses) {
         CustomerDetailDTO dto = new CustomerDetailDTO();
@@ -178,8 +172,7 @@ public class CustomerManagementService {
         dto.setCountryCode(c.getCountryCode());
         dto.setCurrencyCode(c.getCurrencyCode());
         dto.setActive(c.getActive());
-        dto.setSyncedAt(c.getSyncedAt() != null
-                ? c.getSyncedAt().toString() : null);
+        dto.setSyncedAt(c.getSyncedAt() != null ? c.getSyncedAt().toString() : null);
         dto.setLatitude(c.getLatitude());
         dto.setLongitude(c.getLongitude());
         dto.setServiceTime(c.getServiceTime());
@@ -216,41 +209,40 @@ public class CustomerManagementService {
         dto.setUpdatedBy(a.getUpdatedBy());
         dto.setUpdatedAt(a.getUpdatedAt());
 
-        // Load grids
+        String cCode = a.getCustomerCode();
+        String aCode = a.getAddressCode();
+
         dto.setTimeWindows(
-                timeWindowRepository.findByAddressAddressCode(a.getAddressCode())
-                        .stream()
-                        .map(tw -> {
+                timeWindowRepository
+                        .findByAddressCustomerCodeAndAddressAddressCode(cCode, aCode)
+                        .stream().map(tw -> {
                             TimeWindowDTO t = new TimeWindowDTO();
                             t.setId(tw.getId());
                             t.setFromTime(tw.getFromTime());
                             t.setToTime(tw.getToTime());
                             t.setDisplayOrder(tw.getDisplayOrder());
                             return t;
-                        }).toList()
-        );
+                        }).toList());
 
         dto.setVehicles(
-                vehicleRepository.findByAddressAddressCode(a.getAddressCode())
-                        .stream()
-                        .map(v -> {
+                vehicleRepository
+                        .findByAddressCustomerCodeAndAddressAddressCode(cCode, aCode)
+                        .stream().map(v -> {
                             AddressVehicleDTO av = new AddressVehicleDTO();
                             av.setId(v.getId());
                             av.setVehicleCategoryCode(v.getVehicleCategoryCode());
                             return av;
-                        }).toList()
-        );
+                        }).toList());
 
         dto.setDrivers(
-                driverRepository.findByAddressAddressCode(a.getAddressCode())
-                        .stream()
-                        .map(d -> {
+                driverRepository
+                        .findByAddressCustomerCodeAndAddressAddressCode(cCode, aCode)
+                        .stream().map(d -> {
                             AddressDriverDTO ad = new AddressDriverDTO();
                             ad.setId(d.getId());
                             ad.setDriverId(d.getDriverId());
                             return ad;
-                        }).toList()
-        );
+                        }).toList());
 
         return dto;
     }

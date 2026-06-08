@@ -9,7 +9,9 @@ import java.util.UUID;
 public interface AddressTimeWindowRepository
         extends JpaRepository<XRAddressTimeWindow, UUID> {
 
-    List<XRAddressTimeWindow> findByAddressAddressCode(String addressCode);
+    List<XRAddressTimeWindow> findByAddressCustomerCodeAndAddressAddressCode(
+            String customerCode, String addressCode);
 
-    void deleteByAddressAddressCode(String addressCode);
+    void deleteByAddressCustomerCodeAndAddressAddressCode(
+            String customerCode, String addressCode);
 }

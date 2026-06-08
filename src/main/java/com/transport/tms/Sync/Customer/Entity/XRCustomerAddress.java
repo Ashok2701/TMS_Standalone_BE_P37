@@ -9,18 +9,24 @@ import java.util.List;
 
 @Entity
 @Table(name = "xr_customer_address", schema = "tms")
+@IdClass(XRCustomerAddressId.class)
 @Getter
 @Setter
 public class XRCustomerAddress {
 
-    // ── X3 FIELDS (managed by sync, never edit manually) ──────
+    // ── COMPOSITE PK (customerCode + addressCode) ─────────────
+    // In X3, BPAADD_0 (address code) is NOT globally unique —
+    // values like "10", "001" repeat across customers.
+    // The unique key is always (customer_code, address_code).
+    @Id
+    @Column(name = "customer_code")
+    private String customerCode;
+
     @Id
     @Column(name = "address_code")
     private String addressCode;
 
-    @Column(name = "customer_code")
-    private String customerCode;
-
+    // ── X3 FIELDS (managed by sync) ───────────────────────────
     @Column(name = "address_description")
     private String addressDescription;
 
@@ -68,13 +74,13 @@ public class XRCustomerAddress {
 
     // ── TMS FIELDS (managed via TMS UI, never touched by sync) ─
     @Column(name = "any_time_window")
-    private Boolean anyTimeWindow = false;      // true = all time windows applicable
+    private Boolean anyTimeWindow = false;
 
     @Column(name = "any_vehicle_category")
-    private Boolean anyVehicleCategory = false; // true = all vehicle categories eligible
+    private Boolean anyVehicleCategory = false;
 
     @Column(name = "any_driver")
-    private Boolean anyDriver = false;          // true = all drivers eligible
+    private Boolean anyDriver = false;
 
     @Column(name = "updated_by")
     private String updatedBy;
@@ -82,7 +88,8 @@ public class XRCustomerAddress {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    // ── TMS GRID RELATIONS ──────────────────────────────────────
+    // ── TMS GRID RELATIONS ─────────────────────────────────────
+    // FK in child tables now references composite PK via address_code + customer_code
     @OneToMany(
             mappedBy = "address",
             cascade = CascadeType.ALL,

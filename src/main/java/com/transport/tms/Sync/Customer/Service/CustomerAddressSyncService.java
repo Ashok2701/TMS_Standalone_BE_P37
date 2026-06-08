@@ -1,6 +1,7 @@
 package com.transport.tms.Sync.Customer.Service;
 
 import com.transport.tms.Sync.Customer.Entity.XRCustomerAddress;
+import com.transport.tms.Sync.Customer.Entity.XRCustomerAddressId;
 import com.transport.tms.Sync.Customer.Repository.CustomerAddressRepository;
 import com.transport.tms.Sync.Dto.SyncResult;
 import com.transport.tms.Sync.X3.Dto.X3CustomerAddressDTO;
@@ -20,7 +21,6 @@ import java.util.stream.Collectors;
 public class CustomerAddressSyncService {
 
     private final X3CustomerAddressRepository x3Repository;
-
     private final CustomerAddressRepository addressRepository;
 
     @Transactional
@@ -35,12 +35,13 @@ public class CustomerAddressSyncService {
 
         Integer before = (int) addressRepository.count();
 
-        // Load all existing addresses into map — single DB query
+        // KEY FIX: map keyed by "customerCode::addressCode" — not just addressCode
+        // BPAADD_0 ("10", "001" etc) repeats across customers — NOT globally unique
         Map<String, XRCustomerAddress> existingMap =
                 addressRepository.findAll()
                         .stream()
                         .collect(Collectors.toMap(
-                                XRCustomerAddress::getAddressCode,
+                                a -> a.getCustomerCode() + "::" + a.getAddressCode(),
                                 a -> a
                         ));
 
@@ -53,7 +54,9 @@ public class CustomerAddressSyncService {
 
         for (X3CustomerAddressDTO dto : addresses) {
 
-            XRCustomerAddress existing = existingMap.get(dto.getAddressCode());
+            // Composite lookup key
+            String compositeKey = dto.getCustomerCode() + "::" + dto.getAddressCode();
+            XRCustomerAddress existing = existingMap.get(compositeKey);
 
             if (existing == null) {
 
@@ -80,16 +83,14 @@ public class CustomerAddressSyncService {
         Integer after = (int) addressRepository.count();
 
         System.out.println("CUSTOMER ADDRESS SYNC DONE — inserted=" + inserted
-                + " updated=" + updated
-                + " skipped=" + skipped);
+                + " updated=" + updated + " skipped=" + skipped);
 
         return new SyncResult(x3Count, before, after, inserted, updated, 0);
     }
 
     private void mapX3ToEntity(X3CustomerAddressDTO dto, XRCustomerAddress address) {
-
-        address.setAddressCode(dto.getAddressCode());
         address.setCustomerCode(dto.getCustomerCode());
+        address.setAddressCode(dto.getAddressCode());
         address.setAddressDescription(dto.getAddressDescription());
         address.setAddressLine1(dto.getAddressLine1());
         address.setAddressLine2(dto.getAddressLine2());
@@ -107,9 +108,7 @@ public class CustomerAddressSyncService {
     }
 
     private boolean hasChanged(X3CustomerAddressDTO dto, XRCustomerAddress existing) {
-
-        return !eq(dto.getCustomerCode(),       existing.getCustomerCode())
-            || !eq(dto.getAddressDescription(), existing.getAddressDescription())
+        return !eq(dto.getAddressDescription(), existing.getAddressDescription())
             || !eq(dto.getAddressLine1(),       existing.getAddressLine1())
             || !eq(dto.getAddressLine2(),       existing.getAddressLine2())
             || !eq(dto.getAddressLine3(),       existing.getAddressLine3())
@@ -126,7 +125,6 @@ public class CustomerAddressSyncService {
     private boolean eq(String a, String b) {
         return Objects.equals(
                 a == null ? "" : a.trim(),
-                b == null ? "" : b.trim()
-        );
+                b == null ? "" : b.trim());
     }
 }

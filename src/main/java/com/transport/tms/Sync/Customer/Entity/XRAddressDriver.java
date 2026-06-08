@@ -19,7 +19,10 @@ public class XRAddressDriver {
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "address_code")
+    @JoinColumns({
+        @JoinColumn(name = "customer_code", referencedColumnName = "customer_code"),
+        @JoinColumn(name = "address_code",  referencedColumnName = "address_code")
+    })
     private XRCustomerAddress address;
 
     @Column(name = "driver_id", nullable = false)

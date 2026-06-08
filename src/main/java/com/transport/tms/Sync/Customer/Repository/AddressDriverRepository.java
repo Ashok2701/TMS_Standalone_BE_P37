@@ -9,7 +9,9 @@ import java.util.UUID;
 public interface AddressDriverRepository
         extends JpaRepository<XRAddressDriver, UUID> {
 
-    List<XRAddressDriver> findByAddressAddressCode(String addressCode);
+    List<XRAddressDriver> findByAddressCustomerCodeAndAddressAddressCode(
+            String customerCode, String addressCode);
 
-    void deleteByAddressAddressCode(String addressCode);
+    void deleteByAddressCustomerCodeAndAddressAddressCode(
+            String customerCode, String addressCode);
 }
