@@ -25,6 +25,7 @@ import java.util.Map;
                 "com.transport.tms.Fleet.Repository",
                 "com.transport.tms.Sync.Customer.Repository",
                 "com.transport.tms.Sync.Site.Repository",
+                "com.transport.tms.Sync.Product.Repository",
                 "com.transport.tms.Sync.Repository",
                 "com.transport.tms.UserManagement.Repository",
                 "com.transport.tms.Configuration.Document.Repository"
@@ -50,7 +51,6 @@ public class PostgresConfig {
     @Primary
     @Bean(name = "postgresDataSource")
     public DataSource postgresDataSource() {
-
         return postgresDataSourceProperties()
                 .initializeDataSourceBuilder()
                 .build();
@@ -62,7 +62,6 @@ public class PostgresConfig {
             EntityManagerFactoryBuilder builder) {
 
         Map<String, Object> properties = new HashMap<>();
-
         properties.putAll(jpaProperties.getProperties());
 
         return builder
@@ -70,9 +69,10 @@ public class PostgresConfig {
                 .packages(
                         "com.transport.tms.Fleet.Entity",
                         "com.transport.tms.Sync.Entity",
+                        "com.transport.tms.Sync.Customer.Entity",
+                        "com.transport.tms.Sync.Product.Entity",
                         "com.transport.tms.UserManagement.Entity",
                         "com.transport.tms.Sync.Site.Entity",
-                        "com.transport.tms.Sync.Customer.Entity",
                         "com.transport.tms.Configuration.Document.Entity"
                 )
                 .persistenceUnit("postgres")
