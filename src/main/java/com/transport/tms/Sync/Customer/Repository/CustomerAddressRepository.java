@@ -8,9 +8,9 @@ import java.util.List;
 public interface CustomerAddressRepository
         extends JpaRepository<XRCustomerAddress, String> {
 
-    List<XRCustomerAddress> findByCustomerCode(
-            String customerCode);
+    List<XRCustomerAddress> findByCustomerCode(String customerCode);
 
-    void deleteByCustomerCode(
-            String customerCode);
+    void deleteByCustomerCode(String customerCode);
+
+    Integer countByCustomerCode(String customerCode);
 }
