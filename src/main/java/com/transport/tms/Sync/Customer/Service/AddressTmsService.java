@@ -15,64 +15,56 @@ import java.util.List;
 public class AddressTmsService {
 
     private final CustomerAddressRepository addressRepository;
-
     private final AddressTimeWindowRepository timeWindowRepository;
-
     private final AddressVehicleRepository vehicleRepository;
-
     private final AddressDriverRepository driverRepository;
 
-    // ── GET full TMS data for an address ───────────────────────
-    public AddressTmsDTO getTmsData(String addressCode) {
+    // ── GET TMS data ──────────────────────────────────────────
+    public AddressTmsDTO getTmsData(String customerCode, String addressCode) {
 
-        XRCustomerAddress address = addressRepository.findById(addressCode)
-                .orElseThrow(() ->
-                        new RuntimeException("Address not found: " + addressCode));
+        XRCustomerAddress address =
+                addressRepository.findByCustomerCodeAndAddressCode(
+                                customerCode, addressCode)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Address not found: " + customerCode + "/" + addressCode));
 
         AddressTmsDTO dto = new AddressTmsDTO();
-
         dto.setAnyTimeWindow(address.getAnyTimeWindow());
         dto.setAnyVehicleCategory(address.getAnyVehicleCategory());
         dto.setAnyDriver(address.getAnyDriver());
 
-        // Time windows
         dto.setTimeWindows(
-                timeWindowRepository.findByAddressAddressCode(addressCode)
-                        .stream()
-                        .map(this::mapTimeWindow)
-                        .toList()
-        );
+                timeWindowRepository
+                        .findByAddressCustomerCodeAndAddressAddressCode(customerCode, addressCode)
+                        .stream().map(this::mapTimeWindow).toList());
 
-        // Vehicles
         dto.setVehicles(
-                vehicleRepository.findByAddressAddressCode(addressCode)
-                        .stream()
-                        .map(this::mapVehicle)
-                        .toList()
-        );
+                vehicleRepository
+                        .findByAddressCustomerCodeAndAddressAddressCode(customerCode, addressCode)
+                        .stream().map(this::mapVehicle).toList());
 
-        // Drivers
         dto.setDrivers(
-                driverRepository.findByAddressAddressCode(addressCode)
-                        .stream()
-                        .map(this::mapDriver)
-                        .toList()
-        );
+                driverRepository
+                        .findByAddressCustomerCodeAndAddressAddressCode(customerCode, addressCode)
+                        .stream().map(this::mapDriver).toList());
 
         return dto;
     }
 
-    // ── SAVE full TMS data for an address ──────────────────────
-    // Replaces all grids cleanly on each save
+    // ── SAVE TMS data ─────────────────────────────────────────
     @Transactional
-    public AddressTmsDTO saveTmsData(String addressCode,
+    public AddressTmsDTO saveTmsData(String customerCode,
+                                     String addressCode,
                                      AddressTmsDTO dto) {
 
-        XRCustomerAddress address = addressRepository.findById(addressCode)
-                .orElseThrow(() ->
-                        new RuntimeException("Address not found: " + addressCode));
+        XRCustomerAddress address =
+                addressRepository.findByCustomerCodeAndAddressCode(
+                                customerCode, addressCode)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Address not found: " + customerCode + "/" + addressCode));
 
-        // Update flags
         address.setAnyTimeWindow(dto.getAnyTimeWindow());
         address.setAnyVehicleCategory(dto.getAnyVehicleCategory());
         address.setAnyDriver(dto.getAnyDriver());
@@ -80,52 +72,55 @@ public class AddressTmsService {
         address.setUpdatedAt(LocalDateTime.now());
         addressRepository.save(address);
 
-        // ── Time windows — delete all then re-insert ────────────
-        timeWindowRepository.deleteByAddressAddressCode(addressCode);
+        // Time windows — replace all
+        timeWindowRepository.deleteByAddressCustomerCodeAndAddressAddressCode(
+                customerCode, addressCode);
         if (dto.getTimeWindows() != null) {
             int order = 0;
             for (TimeWindowDTO tw : dto.getTimeWindows()) {
-                XRAddressTimeWindow entity = new XRAddressTimeWindow();
-                entity.setAddress(address);
-                entity.setFromTime(tw.getFromTime());
-                entity.setToTime(tw.getToTime());
-                entity.setDisplayOrder(order++);
-                entity.setCreatedAt(LocalDateTime.now());
-                entity.setUpdatedAt(LocalDateTime.now());
-                timeWindowRepository.save(entity);
+                XRAddressTimeWindow e = new XRAddressTimeWindow();
+                e.setAddress(address);
+                e.setFromTime(tw.getFromTime());
+                e.setToTime(tw.getToTime());
+                e.setDisplayOrder(order++);
+                e.setCreatedAt(LocalDateTime.now());
+                e.setUpdatedAt(LocalDateTime.now());
+                timeWindowRepository.save(e);
             }
         }
 
-        // ── Vehicle categories — delete all then re-insert ──────
-        vehicleRepository.deleteByAddressAddressCode(addressCode);
+        // Vehicle categories — replace all
+        vehicleRepository.deleteByAddressCustomerCodeAndAddressAddressCode(
+                customerCode, addressCode);
         if (dto.getVehicles() != null) {
             for (AddressVehicleDTO v : dto.getVehicles()) {
-                XRAddressVehicle entity = new XRAddressVehicle();
-                entity.setAddress(address);
-                entity.setVehicleCategoryCode(v.getVehicleCategoryCode());
-                entity.setCreatedAt(LocalDateTime.now());
-                entity.setUpdatedAt(LocalDateTime.now());
-                vehicleRepository.save(entity);
+                XRAddressVehicle e = new XRAddressVehicle();
+                e.setAddress(address);
+                e.setVehicleCategoryCode(v.getVehicleCategoryCode());
+                e.setCreatedAt(LocalDateTime.now());
+                e.setUpdatedAt(LocalDateTime.now());
+                vehicleRepository.save(e);
             }
         }
 
-        // ── Drivers — delete all then re-insert ─────────────────
-        driverRepository.deleteByAddressAddressCode(addressCode);
+        // Drivers — replace all
+        driverRepository.deleteByAddressCustomerCodeAndAddressAddressCode(
+                customerCode, addressCode);
         if (dto.getDrivers() != null) {
             for (AddressDriverDTO d : dto.getDrivers()) {
-                XRAddressDriver entity = new XRAddressDriver();
-                entity.setAddress(address);
-                entity.setDriverId(d.getDriverId());
-                entity.setCreatedAt(LocalDateTime.now());
-                entity.setUpdatedAt(LocalDateTime.now());
-                driverRepository.save(entity);
+                XRAddressDriver e = new XRAddressDriver();
+                e.setAddress(address);
+                e.setDriverId(d.getDriverId());
+                e.setCreatedAt(LocalDateTime.now());
+                e.setUpdatedAt(LocalDateTime.now());
+                driverRepository.save(e);
             }
         }
 
-        return getTmsData(addressCode);
+        return getTmsData(customerCode, addressCode);
     }
 
-    // ── Mappers ────────────────────────────────────────────────
+    // ── Mappers ───────────────────────────────────────────────
     private TimeWindowDTO mapTimeWindow(XRAddressTimeWindow e) {
         TimeWindowDTO dto = new TimeWindowDTO();
         dto.setId(e.getId());
