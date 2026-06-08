@@ -31,13 +31,13 @@ public class X3CustomerRepository {
 
         String sql = """
             SELECT
-                BPCNUM_0,
-                BPCNAM_0,
-                BPCSHO_0,
-                CRY_0,
-                CUR_0,
-                ENAFLG_0
-            FROM LEWISB.BPCUSTOMER
+                                                          BPCNUM_0,
+                                                          BPCNAM_0,
+                                                          BPCSHO_0,
+                                                          BCGCOD_0 AS  CRY_0,
+                                                          CUR_0
+                
+                                                      FROM LEWISB.BPCUSTOMER
         """;
 
         List<X3CustomerDTO> result = jdbcTemplate.query(
@@ -51,7 +51,7 @@ public class X3CustomerRepository {
                     dto.setShortName(rs.getString("BPCSHO_0"));
                     dto.setCountryCode(rs.getString("CRY_0"));
                     dto.setCurrencyCode(rs.getString("CUR_0"));
-                    dto.setActive(rs.getInt("ENAFLG_0") == 2);
+                    dto.setActive(true);
 
                     return dto;
                 }

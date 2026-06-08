@@ -39,27 +39,20 @@ public class X3ProductRepository {
         // ITMDES     = item descriptions per language (ITMDES1_0, ITMDES2_0)
         // Join on ITMREF_0, take English (LAN_0 = 'ENG') or first available language
         String sql = """
-            SELECT
-                M.ITMREF_0,
-                ISNULL(D.ITMDES1_0, '')   AS ITMDES1_0,
-                ISNULL(D.ITMDES2_0, '')   AS ITMDES2_0,
-                ISNULL(M.TCLCOD_0, '')    AS TCLCOD_0,
-                ISNULL(M.UOM_0, '')       AS UOM_0,
-                ISNULL(M.SAU_0, '')       AS SAU_0,
-                ISNULL(M.NETWEI_0, 0)     AS NETWEI_0,
-                ISNULL(M.GROWEI_0, 0)     AS GROWEI_0,
-                ISNULL(M.VOL_0, 0)        AS VOL_0,
-                ISNULL(M.WEU_0, '')       AS WEU_0,
-                ISNULL(M.VOU_0, '')       AS VOU_0,
-                ISNULL(M.ENAFLG_0, 2)     AS ENAFLG_0
-            FROM LEWISB.ITMMASTER M
-            LEFT JOIN LEWISB.ITMDES D
-                ON  D.ITMREF_0 = M.ITMREF_0
-                AND D.LANNUM_0 = (
-                    SELECT MIN(LANNUM_0)
-                    FROM LEWISB.ITMDES
-                    WHERE ITMREF_0 = M.ITMREF_0
-                )
+          SELECT
+                                 M.ITMREF_0,
+                                 ISNULL(M.ITMDES1_0, '')   AS ITMDES1_0,
+                                 ISNULL(M.ITMDES2_0, '')   AS ITMDES2_0,
+                                 ISNULL(M.TCLCOD_0, '')    AS TCLCOD_0,
+                                 ISNULL(M.STU_0, '')       AS UOM_0,
+                                 ISNULL(M.SAU_0, '')       AS SAU_0,
+                                 ISNULL(M.ITMWEI_0, 0)     AS NETWEI_0,
+                                 ISNULL(M.ITMWEI_0, 0)     AS GROWEI_0,
+                                 ISNULL(M.ITMVOU_0, 0)        AS VOL_0,
+                                 ISNULL(M.WEU_0, '')       AS WEU_0,
+                                 ISNULL(M.VOU_0, '')       AS VOU_0,
+                                 ISNULL(M.DLVFLG_0, 2)     AS ENAFLG_0
+                             FROM LEWISB.ITMMASTER M
         """;
 
         List<X3ProductDTO> result = jdbcTemplate.query(
