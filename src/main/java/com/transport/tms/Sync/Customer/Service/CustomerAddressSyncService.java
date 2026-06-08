@@ -11,6 +11,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -23,56 +26,107 @@ public class CustomerAddressSyncService {
     @Transactional
     public SyncResult sync() {
 
-        Integer x3Count =
-                x3Repository.count();
+        System.out.println("======================");
+        System.out.println("CUSTOMER ADDRESS SYNC STARTED");
+        System.out.println("======================");
 
-        Integer before =
-                (int) addressRepository.count();
+        Integer x3Count = x3Repository.count();
+        System.out.println("X3 count = " + x3Count);
 
-        List<X3CustomerAddressDTO> addresses =
-                x3Repository.findCustomerAddresses();
+        Integer before = (int) addressRepository.count();
+
+        // Load all existing addresses into map — single DB query
+        Map<String, XRCustomerAddress> existingMap =
+                addressRepository.findAll()
+                        .stream()
+                        .collect(Collectors.toMap(
+                                XRCustomerAddress::getAddressCode,
+                                a -> a
+                        ));
+
+        List<X3CustomerAddressDTO> addresses = x3Repository.findCustomerAddresses();
+        System.out.println("X3 CUSTOMER ADDRESSES FETCHED = " + addresses.size());
 
         int inserted = 0;
         int updated  = 0;
+        int skipped  = 0;
 
         for (X3CustomerAddressDTO dto : addresses) {
 
-            boolean exists =
-                    addressRepository.existsById(
-                            dto.getAddressCode());
+            XRCustomerAddress existing = existingMap.get(dto.getAddressCode());
 
-            XRCustomerAddress address =
-                    addressRepository
-                            .findById(dto.getAddressCode())
-                            .orElse(new XRCustomerAddress());
+            if (existing == null) {
 
-            address.setAddressCode(dto.getAddressCode());
-            address.setCustomerCode(dto.getCustomerCode());
-            address.setAddressDescription(dto.getAddressDescription());
-            address.setAddressLine1(dto.getAddressLine1());
-            address.setAddressLine2(dto.getAddressLine2());
-            address.setAddressLine3(dto.getAddressLine3());
-            address.setCity(dto.getCity());
-            address.setPostalCode(dto.getPostalCode());
-            address.setStateCode(dto.getStateCode());
-            address.setCountryCode(dto.getCountryCode());
-            address.setCountryName(dto.getCountryName());
-            address.setPhone(dto.getPhone());
-            address.setMobile(dto.getMobile());
-            address.setWebSite(dto.getWebSite());
-            address.setDefaultAddress(dto.getDefaultAddress());
-            address.setSyncedAt(LocalDateTime.now());
+                // NEW — insert
+                XRCustomerAddress address = new XRCustomerAddress();
+                mapX3ToEntity(dto, address);
+                addressRepository.save(address);
+                inserted++;
 
-            addressRepository.save(address);
+            } else if (hasChanged(dto, existing)) {
 
-            if (exists) updated++;
-            else         inserted++;
+                // CHANGED — update
+                mapX3ToEntity(dto, existing);
+                addressRepository.save(existing);
+                updated++;
+
+            } else {
+
+                // UNCHANGED — skip
+                skipped++;
+            }
         }
 
-        Integer after =
-                (int) addressRepository.count();
+        Integer after = (int) addressRepository.count();
 
-        return new SyncResult(
-                x3Count, before, after, inserted, updated, 0);
+        System.out.println("CUSTOMER ADDRESS SYNC DONE — inserted=" + inserted
+                + " updated=" + updated
+                + " skipped=" + skipped);
+
+        return new SyncResult(x3Count, before, after, inserted, updated, 0);
+    }
+
+    private void mapX3ToEntity(X3CustomerAddressDTO dto, XRCustomerAddress address) {
+
+        address.setAddressCode(dto.getAddressCode());
+        address.setCustomerCode(dto.getCustomerCode());
+        address.setAddressDescription(dto.getAddressDescription());
+        address.setAddressLine1(dto.getAddressLine1());
+        address.setAddressLine2(dto.getAddressLine2());
+        address.setAddressLine3(dto.getAddressLine3());
+        address.setCity(dto.getCity());
+        address.setPostalCode(dto.getPostalCode());
+        address.setStateCode(dto.getStateCode());
+        address.setCountryCode(dto.getCountryCode());
+        address.setCountryName(dto.getCountryName());
+        address.setPhone(dto.getPhone());
+        address.setMobile(dto.getMobile());
+        address.setWebSite(dto.getWebSite());
+        address.setDefaultAddress(dto.getDefaultAddress());
+        address.setSyncedAt(LocalDateTime.now());
+    }
+
+    private boolean hasChanged(X3CustomerAddressDTO dto, XRCustomerAddress existing) {
+
+        return !eq(dto.getCustomerCode(),       existing.getCustomerCode())
+            || !eq(dto.getAddressDescription(), existing.getAddressDescription())
+            || !eq(dto.getAddressLine1(),       existing.getAddressLine1())
+            || !eq(dto.getAddressLine2(),       existing.getAddressLine2())
+            || !eq(dto.getAddressLine3(),       existing.getAddressLine3())
+            || !eq(dto.getCity(),               existing.getCity())
+            || !eq(dto.getPostalCode(),         existing.getPostalCode())
+            || !eq(dto.getStateCode(),          existing.getStateCode())
+            || !eq(dto.getCountryCode(),        existing.getCountryCode())
+            || !eq(dto.getCountryName(),        existing.getCountryName())
+            || !eq(dto.getPhone(),              existing.getPhone())
+            || !eq(dto.getMobile(),             existing.getMobile())
+            || !eq(dto.getWebSite(),            existing.getWebSite());
+    }
+
+    private boolean eq(String a, String b) {
+        return Objects.equals(
+                a == null ? "" : a.trim(),
+                b == null ? "" : b.trim()
+        );
     }
 }

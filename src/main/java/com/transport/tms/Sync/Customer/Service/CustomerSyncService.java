@@ -1,160 +1,115 @@
 package com.transport.tms.Sync.Customer.Service;
 
-
 import com.transport.tms.Sync.Customer.Entity.XRCustomer;
-
 import com.transport.tms.Sync.Customer.Repository.CustomerRepository;
-
 import com.transport.tms.Sync.Dto.SyncResult;
-
 import com.transport.tms.Sync.X3.Dto.X3CustomerDTO;
-
 import com.transport.tms.Sync.X3.Repository.X3CustomerRepository;
-
-
 import lombok.RequiredArgsConstructor;
-
 import org.springframework.stereotype.Service;
-
 import org.springframework.transaction.annotation.Transactional;
 
-
 import java.time.LocalDateTime;
-
 import java.util.List;
-
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class CustomerSyncService {
 
-
     private final X3CustomerRepository x3Repository;
-
 
     private final CustomerRepository customerRepository;
 
-
-
     @Transactional
-    public SyncResult sync(){
+    public SyncResult sync() {
 
+        System.out.println("======================");
+        System.out.println("CUSTOMER SYNC STARTED");
+        System.out.println("======================");
 
+        Integer x3Count = x3Repository.count();
+        System.out.println("X3 count = " + x3Count);
 
-        Integer x3Count =
-                x3Repository.count();
+        Integer before = (int) customerRepository.count();
 
+        // Load all existing customers into map — single DB query
+        Map<String, XRCustomer> existingMap =
+                customerRepository.findAll()
+                        .stream()
+                        .collect(Collectors.toMap(
+                                XRCustomer::getCustomerCode,
+                                c -> c
+                        ));
 
+        List<X3CustomerDTO> customers = x3Repository.findCustomers();
+        System.out.println("X3 CUSTOMERS FETCHED = " + customers.size());
 
-        Integer before =
-                (int)customerRepository.count();
+        int inserted = 0;
+        int updated  = 0;
+        int skipped  = 0;
 
+        for (X3CustomerDTO dto : customers) {
 
+            XRCustomer existing = existingMap.get(dto.getCustomerCode());
 
-        List<X3CustomerDTO> customers =
-                x3Repository.findCustomers();
+            if (existing == null) {
 
-
-
-        int inserted=0;
-
-
-        int updated=0;
-
-
-
-
-        for(X3CustomerDTO dto:customers){
-
-
-
-            boolean exists =
-                    customerRepository.existsById(
-                            dto.getCustomerCode());
-
-
-
-            XRCustomer customer =
-                    customerRepository
-                            .findById(dto.getCustomerCode())
-
-                            .orElse(new XRCustomer());
-
-
-
-
-            customer.setCustomerCode(
-                    dto.getCustomerCode());
-
-
-
-            customer.setCustomerName(
-                    dto.getCustomerName());
-
-
-
-            customer.setShortName(
-                    dto.getShortName());
-
-
-
-            customer.setCountryCode(
-                    dto.getCountryCode());
-
-
-
-            customer.setCurrencyCode(
-                    dto.getCurrencyCode());
-
-
-
-            customer.setActive(
-                    dto.getActive());
-
-
-
-            customer.setSyncedAt(
-                    LocalDateTime.now());
-
-
-
-            customerRepository.save(customer);
-
-
-
-            if(exists)
-                updated++;
-            else
+                // NEW — insert
+                XRCustomer customer = new XRCustomer();
+                mapX3ToEntity(dto, customer);
+                customerRepository.save(customer);
                 inserted++;
 
+            } else if (hasChanged(dto, existing)) {
+
+                // CHANGED — update
+                mapX3ToEntity(dto, existing);
+                customerRepository.save(existing);
+                updated++;
+
+            } else {
+
+                // UNCHANGED — skip
+                skipped++;
+            }
         }
 
+        Integer after = (int) customerRepository.count();
 
+        System.out.println("CUSTOMER SYNC DONE — inserted=" + inserted
+                + " updated=" + updated
+                + " skipped=" + skipped);
 
-        Integer after =
-                (int)customerRepository.count();
-
-
-
-
-        return new SyncResult(
-
-                x3Count,
-
-                before,
-
-                after,
-
-                inserted,
-
-                updated,
-
-                0
-
-        );
-
-
-
+        return new SyncResult(x3Count, before, after, inserted, updated, 0);
     }
 
+    private void mapX3ToEntity(X3CustomerDTO dto, XRCustomer customer) {
+
+        customer.setCustomerCode(dto.getCustomerCode());
+        customer.setCustomerName(dto.getCustomerName());
+        customer.setShortName(dto.getShortName());
+        customer.setCountryCode(dto.getCountryCode());
+        customer.setCurrencyCode(dto.getCurrencyCode());
+        customer.setActive(dto.getActive());
+        customer.setSyncedAt(LocalDateTime.now());
+    }
+
+    private boolean hasChanged(X3CustomerDTO dto, XRCustomer existing) {
+
+        return !eq(dto.getCustomerName(),  existing.getCustomerName())
+            || !eq(dto.getShortName(),     existing.getShortName())
+            || !eq(dto.getCountryCode(),   existing.getCountryCode())
+            || !eq(dto.getCurrencyCode(),  existing.getCurrencyCode())
+            || !Objects.equals(dto.getActive(), existing.getActive());
+    }
+
+    private boolean eq(String a, String b) {
+        return Objects.equals(
+                a == null ? "" : a.trim(),
+                b == null ? "" : b.trim()
+        );
+    }
 }
