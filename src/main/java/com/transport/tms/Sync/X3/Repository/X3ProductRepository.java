@@ -21,36 +21,45 @@ public class X3ProductRepository {
 
     public Integer count() {
 
-        // ITMMASTER is the standard X3 item master table
-        // If this returns 0, verify the correct table name in your X3 SQL Server schema
-        // Common alternatives: ITMMASTER, ITMBPS, ITMFACILIT
+        // ITMMASTER = base item master table in X3
+        // Each item has one row per company (CPY_0)
         String sql = """
-            SELECT COUNT(*)
+            SELECT COUNT(DISTINCT ITMREF_0)
             FROM LEWISB.ITMMASTER
         """;
 
         Integer count = jdbcTemplate.queryForObject(sql, Integer.class);
-        System.out.println("X3 PRODUCT COUNT = " + count);
+        System.out.println("X3 PRODUCT COUNT (ITMMASTER) = " + count);
         return count;
     }
 
     public List<X3ProductDTO> findProducts() {
 
+        // ITMMASTER  = base item record (ITMREF_0, TCLCOD_0, UOM_0, weights etc)
+        // ITMDES     = item descriptions per language (ITMDES1_0, ITMDES2_0)
+        // Join on ITMREF_0, take English (LAN_0 = 'ENG') or first available language
         String sql = """
             SELECT
-                I.ITMREF_0,
-                I.ITMDES1_0,
-                I.ITMDES2_0,
-                I.TCLCOD_0,
-                I.UOM_0,
-                I.SAU_0,
-                I.NETWEI_0,
-                I.GROWEI_0,
-                I.VOL_0,
-                I.WEU_0,
-                I.VOU_0,
-                I.ENAFLG_0
-            FROM LEWISB.ITMMASTER I
+                M.ITMREF_0,
+                ISNULL(D.ITMDES1_0, '')   AS ITMDES1_0,
+                ISNULL(D.ITMDES2_0, '')   AS ITMDES2_0,
+                ISNULL(M.TCLCOD_0, '')    AS TCLCOD_0,
+                ISNULL(M.UOM_0, '')       AS UOM_0,
+                ISNULL(M.SAU_0, '')       AS SAU_0,
+                ISNULL(M.NETWEI_0, 0)     AS NETWEI_0,
+                ISNULL(M.GROWEI_0, 0)     AS GROWEI_0,
+                ISNULL(M.VOL_0, 0)        AS VOL_0,
+                ISNULL(M.WEU_0, '')       AS WEU_0,
+                ISNULL(M.VOU_0, '')       AS VOU_0,
+                ISNULL(M.ENAFLG_0, 2)     AS ENAFLG_0
+            FROM LEWISB.ITMMASTER M
+            LEFT JOIN LEWISB.ITMDES D
+                ON  D.ITMREF_0 = M.ITMREF_0
+                AND D.LANNUM_0 = (
+                    SELECT MIN(LANNUM_0)
+                    FROM LEWISB.ITMDES
+                    WHERE ITMREF_0 = M.ITMREF_0
+                )
         """;
 
         List<X3ProductDTO> result = jdbcTemplate.query(
@@ -70,6 +79,7 @@ public class X3ProductRepository {
                     dto.setVolume(rs.getDouble("VOL_0"));
                     dto.setWeightUnit(rs.getString("WEU_0"));
                     dto.setVolumeUnit(rs.getString("VOU_0"));
+                    // ENAFLG_0 = 2 means active in X3
                     dto.setActive(rs.getInt("ENAFLG_0") == 2);
 
                     return dto;
