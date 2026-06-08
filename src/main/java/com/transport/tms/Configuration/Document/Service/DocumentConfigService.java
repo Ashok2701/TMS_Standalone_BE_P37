@@ -7,24 +7,19 @@ import java.util.UUID;
 
 public interface DocumentConfigService {
 
-
-    DocumentConfigDTO create(
-            DocumentConfigDTO dto);
-
+    DocumentConfigDTO create(DocumentConfigDTO dto);
 
     List<DocumentConfigDTO> getAll();
 
+    List<DocumentConfigDTO> getAllActive();
 
-    DocumentConfigDTO getById(
-            UUID id);
+    List<DocumentConfigDTO> getByDocumentType(String documentType);
 
+    DocumentConfigDTO getById(UUID id);
 
-    DocumentConfigDTO update(
-            UUID id,
-            DocumentConfigDTO dto);
+    DocumentConfigDTO update(UUID id, DocumentConfigDTO dto);
 
+    DocumentConfigDTO toggleActive(UUID id);
 
-    void delete(
-            UUID id);
-
+    void delete(UUID id);
 }
