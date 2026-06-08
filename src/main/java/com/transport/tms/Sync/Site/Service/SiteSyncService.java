@@ -1,232 +1,148 @@
 package com.transport.tms.Sync.Site.Service;
 
-
-
 import com.transport.tms.Sync.Dto.SyncResult;
-
 import com.transport.tms.Sync.Site.Entity.XRSite;
-
 import com.transport.tms.Sync.Site.Repository.SiteRepository;
-
 import com.transport.tms.Sync.X3.Dto.X3SiteDTO;
-
 import com.transport.tms.Sync.X3.Repository.X3SiteRepository;
-
-
 import lombok.RequiredArgsConstructor;
-
-
 import org.springframework.stereotype.Service;
-
 import org.springframework.transaction.annotation.Transactional;
 
-
 import java.time.LocalDateTime;
-
 import java.util.List;
-
-
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class SiteSyncService {
 
-
-
     private final X3SiteRepository x3Repository;
-
 
     private final SiteRepository repository;
 
-
-
-
     @Transactional
-    public SyncResult sync(){
+    public SyncResult sync() {
 
         System.out.println("======================");
         System.out.println("SITE SYNC STARTED");
         System.out.println("======================");
 
-        Integer x3Count =
-                x3Repository.count();
+        Integer x3Count = x3Repository.count();
+        System.out.println("X3 count = " + x3Count);
 
-        System.out.println("X3 count"+ x3Count);
+        Integer before = (int) repository.count();
 
-        Integer before =
-                (int) repository.count();
+        // Load ALL existing postgres sites into a map once — avoids N individual DB hits
+        Map<String, XRSite> existingMap =
+                repository.findAll()
+                        .stream()
+                        .collect(Collectors.toMap(
+                                XRSite::getSiteCode,
+                                s -> s
+                        ));
 
+        List<X3SiteDTO> sites = x3Repository.findSites();
+        System.out.println("X3 SITES FETCHED = " + sites.size());
 
+        int inserted = 0;
+        int updated  = 0;
+        int skipped  = 0;
+        int failed   = 0;
 
-        List<X3SiteDTO> sites =
-                x3Repository.findSites();
+        for (X3SiteDTO dto : sites) {
 
+            try {
 
-        System.out.println(
-                "X3 SITES FETCHED = "
-                        + sites.size()
-        );
+                XRSite existing = existingMap.get(dto.getSiteCode());
 
-        int inserted=0;
+                if (existing == null) {
 
-        int updated=0;
+                    // ── NEW SITE ── insert
+                    XRSite site = new XRSite();
+                    site.setCreatedAt(LocalDateTime.now());
+                    mapX3ToEntity(dto, site);
+                    repository.save(site);
+                    inserted++;
+                    System.out.println("INSERTED site: " + dto.getSiteCode());
 
-        int failed=0;
+                } else if (hasChanged(dto, existing)) {
 
+                    // ── CHANGED SITE ── update only changed fields
+                    mapX3ToEntity(dto, existing);
+                    repository.save(existing);
+                    updated++;
+                    System.out.println("UPDATED site: " + dto.getSiteCode());
 
+                } else {
 
-
-        for(X3SiteDTO dto: sites){
-
-
-            try{
-
-
-                boolean exists =
-                        repository.existsById(
-                                dto.getSiteCode()
-                        );
-
-
-
-                boolean isNew = false;
-
-
-                XRSite site =
-                        repository
-                                .findById(dto.getSiteCode())
-                                .orElse(null);
-
-
-                if(site == null){
-
-                    site = new XRSite();
-
-                    site.setCreatedAt(
-                            LocalDateTime.now()
-                    );
-
-                    isNew = true;
-
+                    // ── UNCHANGED ── skip entirely
+                    skipped++;
                 }
 
-
-
-
-                site.setSiteCode(
-                        dto.getSiteCode());
-
-
-                site.setSiteName(
-                        dto.getSiteName());
-
-
-                site.setShortName(
-                        dto.getShortName());
-
-
-                site.setCountryCode(
-                        dto.getCountryCode());
-
-
-                site.setSyncedAt(
-                        LocalDateTime.now());
-
-                site.setAddressCode(
-                        dto.getAddressCode());
-
-                site.setAddressDescription(
-                        dto.getAddressDescription());
-
-                site.setAddressLine1(
-                        dto.getAddressLine1());
-
-                site.setAddressLine2(
-                        dto.getAddressLine2());
-
-                site.setAddressLine3(
-                        dto.getAddressLine3());
-
-                site.setPostalCode(
-                        dto.getPostalCode());
-
-                site.setCity(
-                        dto.getCity());
-
-                site.setStateCode(
-                        dto.getStateCode());
-
-                site.setCountryName(
-                        dto.getCountryName());
-
-                System.out.println(
-                        "Saving Site : "
-                                + site.getSiteCode()
-                );
-
-                repository.save(site);
-
-
-
-                if(exists)
-
-                    updated++;
-
-                else
-
-                    inserted++;
-
-
-
-            }catch(Exception e){
-
+            } catch (Exception e) {
 
                 failed++;
-
-
                 System.out.println(
-                        "SITE FAILED : "
-                                + dto.getSiteCode()
-                                + " ERROR : "
-                                + e.getMessage()
-                );
-
-
+                        "SITE FAILED : " + dto.getSiteCode()
+                                + " ERROR : " + e.getMessage());
                 e.printStackTrace();
-
-
             }
-
         }
 
+        Integer after = (int) repository.count();
 
+        System.out.println("SYNC DONE — inserted=" + inserted
+                + " updated=" + updated
+                + " skipped=" + skipped
+                + " failed=" + failed);
 
-        Integer after =
-                (int)repository.count();
-
-
-
-
-        return new SyncResult(
-
-                x3Count,
-
-                before,
-
-                after,
-
-                inserted,
-
-                updated,
-
-                failed
-
-        );
-
-
-
+        return new SyncResult(x3Count, before, after, inserted, updated, failed);
     }
 
+    // ── Map X3 fields → entity (only X3-owned fields, never touch TMS fields) ──
+    private void mapX3ToEntity(X3SiteDTO dto, XRSite site) {
 
+        site.setSiteCode(dto.getSiteCode());
+        site.setSiteName(dto.getSiteName());
+        site.setShortName(dto.getShortName());
+        site.setCountryCode(dto.getCountryCode());
+        site.setAddressCode(dto.getAddressCode());
+        site.setAddressDescription(dto.getAddressDescription());
+        site.setAddressLine1(dto.getAddressLine1());
+        site.setAddressLine2(dto.getAddressLine2());
+        site.setAddressLine3(dto.getAddressLine3());
+        site.setPostalCode(dto.getPostalCode());
+        site.setCity(dto.getCity());
+        site.setStateCode(dto.getStateCode());
+        site.setCountryName(dto.getCountryName());
+        site.setSyncedAt(LocalDateTime.now());
+    }
 
+    // ── Compare X3 data vs existing Postgres row ──
+    // Returns true only if at least one X3-owned field differs
+    private boolean hasChanged(X3SiteDTO dto, XRSite existing) {
+
+        return !eq(dto.getSiteName(),          existing.getSiteName())
+            || !eq(dto.getShortName(),         existing.getShortName())
+            || !eq(dto.getCountryCode(),       existing.getCountryCode())
+            || !eq(dto.getAddressCode(),       existing.getAddressCode())
+            || !eq(dto.getAddressDescription(),existing.getAddressDescription())
+            || !eq(dto.getAddressLine1(),      existing.getAddressLine1())
+            || !eq(dto.getAddressLine2(),      existing.getAddressLine2())
+            || !eq(dto.getAddressLine3(),      existing.getAddressLine3())
+            || !eq(dto.getPostalCode(),        existing.getPostalCode())
+            || !eq(dto.getCity(),              existing.getCity())
+            || !eq(dto.getStateCode(),         existing.getStateCode())
+            || !eq(dto.getCountryName(),       existing.getCountryName());
+    }
+
+    private boolean eq(String a, String b) {
+        return Objects.equals(
+                a == null ? "" : a.trim(),
+                b == null ? "" : b.trim()
+        );
+    }
 }
