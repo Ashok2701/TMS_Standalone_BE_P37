@@ -1,6 +1,8 @@
 package com.transport.tms.Fleet.Controller;
 
 import com.transport.tms.Fleet.Dto.DriverDTO;
+import com.transport.tms.Fleet.Entity.DropdownData;
+import com.transport.tms.Fleet.Repository.CommonRepository;
 import com.transport.tms.Fleet.Service.DriverService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -13,11 +15,10 @@ import java.util.List;
 public class DriverController {
 
     private final DriverService service;
+    private final CommonRepository commonRepository;
 
     @PostMapping
-    public DriverDTO create(
-            @RequestBody DriverDTO dto) {
-
+    public DriverDTO create(@RequestBody DriverDTO dto) {
         return service.create(dto);
     }
 
@@ -25,27 +26,22 @@ public class DriverController {
     public DriverDTO update(
             @PathVariable String driverId,
             @RequestBody DriverDTO dto) {
-
         return service.update(driverId, dto);
     }
 
     @GetMapping("/{driverId}")
-    public DriverDTO getById(
-            @PathVariable String driverId) {
-
+    public DriverDTO getById(@PathVariable String driverId) {
         return service.getById(driverId);
     }
 
+    // Returns drivers from X3 (SQL Server) — has actual data
     @GetMapping
-    public List<DriverDTO> getAll() {
-
-        return service.getAll();
+    public List<DropdownData> getAll() {
+        return commonRepository.getDriverList();
     }
 
     @DeleteMapping("/{driverId}")
-    public void delete(
-            @PathVariable String driverId) {
-
+    public void delete(@PathVariable String driverId) {
         service.delete(driverId);
     }
 }
