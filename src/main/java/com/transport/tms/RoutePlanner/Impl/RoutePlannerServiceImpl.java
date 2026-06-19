@@ -8,7 +8,8 @@ import com.transport.tms.RoutePlanner.Repository.RoutePlannerDriverRepository;
 import com.transport.tms.RoutePlanner.Repository.RoutePlannerSiteRepository;
 import com.transport.tms.RoutePlanner.Repository.RoutePlannerVehicleRepository;
 import com.transport.tms.RoutePlanner.Repository.StopEnrichmentRepository;
-import com.transport.tms.RoutePlanner.Repository.StopEnrichmentRepository.StopEnrichment;
+import com.transport.tms.RoutePlanner.Repository.StopEnrichment;
+
 import com.transport.tms.RoutePlanner.Repository.X3RoutePlannerRepository;
 import com.transport.tms.RoutePlanner.Service.RoutePlannerService;
 import com.transport.tms.Sync.Site.Entity.XRSite;
