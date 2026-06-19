@@ -74,7 +74,8 @@ public class PostgresConfig {
                         "com.transport.tms.Sync.Product.Entity",    // XRProduct
                         "com.transport.tms.UserManagement.Entity",
                         "com.transport.tms.Sync.Site.Entity",
-                        "com.transport.tms.Configuration.Document.Entity"
+                        "com.transport.tms.Configuration.Document.Entity",
+                        "com.transport.tms.RoutePlanner.Repository"  // StopEnrichment @Entity
                 )
                 .persistenceUnit("postgres")
                 .properties(properties)
