@@ -28,7 +28,8 @@ import java.util.Map;
                 "com.transport.tms.Sync.Product.Repository",
                 "com.transport.tms.Sync.Repository",
                 "com.transport.tms.UserManagement.Repository",
-                "com.transport.tms.Configuration.Document.Repository"
+                "com.transport.tms.Configuration.Document.Repository",
+                "com.transport.tms.RoutePlanner.Repository"
         },
         entityManagerFactoryRef = "postgresEntityManagerFactory",
         transactionManagerRef = "postgresTransactionManager"
