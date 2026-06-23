@@ -29,7 +29,8 @@ import java.util.Map;
                 "com.transport.tms.Sync.Repository",
                 "com.transport.tms.UserManagement.Repository",
                 "com.transport.tms.Configuration.Document.Repository",
-                "com.transport.tms.RoutePlanner.Repository"
+                "com.transport.tms.RoutePlanner.Repository",
+                "com.transport.tms.Trip.Repository"
         },
         entityManagerFactoryRef = "postgresEntityManagerFactory",
         transactionManagerRef = "postgresTransactionManager"
@@ -75,7 +76,8 @@ public class PostgresConfig {
                         "com.transport.tms.UserManagement.Entity",
                         "com.transport.tms.Sync.Site.Entity",
                         "com.transport.tms.Configuration.Document.Entity",
-                        "com.transport.tms.RoutePlanner.Repository"  // StopEnrichment @Entity
+                        "com.transport.tms.RoutePlanner.Repository",
+                "com.transport.tms.Trip.Entity"               // XrTrip @Entity
                 )
                 .persistenceUnit("postgres")
                 .properties(properties)
