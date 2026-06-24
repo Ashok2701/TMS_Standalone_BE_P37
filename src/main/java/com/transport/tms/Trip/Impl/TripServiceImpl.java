@@ -6,6 +6,8 @@ import com.transport.tms.Trip.Dto.TripStatusDTO;
 import com.transport.tms.Trip.Entity.XrTrip;
 import com.transport.tms.Trip.Repository.TripRepository;
 import com.transport.tms.Trip.Service.TripService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.transport.tms.Trip.Dto.OptimisationRequestDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +24,7 @@ import java.util.stream.Collectors;
 public class TripServiceImpl implements TripService {
 
     private final TripRepository repo;
+    private final ObjectMapper objectMapper;
 
     // ── CREATE ────────────────────────────────────────────────
     @Override
@@ -88,12 +91,88 @@ public class TripServiceImpl implements TripService {
 
     // ── PATCH optimise ────────────────────────────────────────
     @Override
-    public TripResponseDTO optimiseTrip(Long id, String orderMode, String startTime) {
+    @SuppressWarnings("unchecked")
+    public TripResponseDTO optimiseTrip(Long id, OptimisationRequestDTO req) {
         XrTrip trip = findOrThrow(id);
+
+        // ── Status & settings ─────────────────────────────────
         trip.setOptiStatus("Optimised");
-        trip.setHeuExec(orderMode != null ? orderMode : "fixed");
+        trip.setHeuExec(req.getOrderMode() != null ? req.getOrderMode() : "fixed");
         trip.setDatExec(OffsetDateTime.now());
-        if (startTime != null) trip.setStartTime(startTime);
+
+        if (req.getStartTime()    != null) trip.setStartTime(req.getStartTime());
+        if (req.getEndTime()      != null) trip.setEndTime(req.getEndTime());
+        if (req.getTravelTime()   != null) trip.setTravelTime(req.getTravelTime());
+        if (req.getTotalTime()    != null) trip.setTotalTime(req.getTotalTime());
+        if (req.getServiceTime()  != null) trip.setServiceTime(req.getServiceTime());
+        if (req.getTotalDistance()!= null) trip.setTotalDistance(req.getTotalDistance());
+        if (req.getUomDistance()  != null) trip.setUomDistance(req.getUomDistance());
+        if (req.getTotalCost()    != null) trip.setTotalCost(req.getTotalCost());
+        if (req.getDistanceCost() != null) trip.setDistanceCost(req.getDistanceCost());
+        if (req.getFixedCost()    != null) trip.setFixedCost(req.getFixedCost());
+        if (req.getServiceCost()  != null) trip.setServiceCost(req.getServiceCost());
+        if (req.getRegularCost()  != null) trip.setRegularCost(req.getRegularCost());
+        if (req.getOvertimeCost() != null) trip.setOvertimeCost(req.getOvertimeCost());
+
+        // ── Merge per-stop results into stopObjects JSONB ─────
+        if (req.getStopResults() != null && !req.getStopResults().isEmpty()
+                && trip.getStopObjects() != null) {
+            try {
+                // Convert stopObjects (List<Object>) to List<Map>
+                List<java.util.Map<String, Object>> stopList =
+                    objectMapper.convertValue(trip.getStopObjects(),
+                        objectMapper.getTypeFactory().constructCollectionType(
+                            List.class, java.util.Map.class));
+
+                // Build a lookup map: docNum → StopOptimisationResult
+                java.util.Map<String, OptimisationRequestDTO.StopOptimisationResult> resultMap
+                    = new java.util.HashMap<>();
+                for (OptimisationRequestDTO.StopOptimisationResult r : req.getStopResults()) {
+                    if (r.getDocNum() != null) resultMap.put(r.getDocNum(), r);
+                }
+
+                // Merge each stop result by matching docNum OR by seq index
+                for (int i = 0; i < stopList.size(); i++) {
+                    java.util.Map<String, Object> stop = stopList.get(i);
+
+                    // Try match by docNum first, then by seq (1-based)
+                    String docNum = stop.getOrDefault("txn",
+                                   stop.getOrDefault("docNum",
+                                   stop.getOrDefault("id", ""))).toString();
+
+                    OptimisationRequestDTO.StopOptimisationResult r = resultMap.get(docNum);
+                    if (r == null) {
+                        // Fallback: match by seq position (i+1)
+                        for (OptimisationRequestDTO.StopOptimisationResult sr : req.getStopResults()) {
+                            if (sr.getSeq() != null && sr.getSeq() == i + 1) { r = sr; break; }
+                        }
+                    }
+
+                    if (r != null) {
+                        // Arrival / Departure
+                        if (r.getArrivalDate()        != null) stop.put("arrivalDate",        r.getArrivalDate());
+                        if (r.getArrivalTime()        != null) stop.put("arrivalTime",        r.getArrivalTime());
+                        if (r.getDepartureDate()      != null) stop.put("departureDate",      r.getDepartureDate());
+                        if (r.getDepartureTime()      != null) stop.put("departureTime",      r.getDepartureTime());
+                        // Distance / travel from previous stop
+                        if (r.getFromPrevDistance()   != null) stop.put("fromPrevDistance",   r.getFromPrevDistance());
+                        if (r.getFromPrevTravelTime() != null) stop.put("fromPrevTravelTime", r.getFromPrevTravelTime());
+                        // At-stop metrics
+                        if (r.getServiceTime()        != null) stop.put("serviceTime",        r.getServiceTime());
+                        if (r.getWaitingTime()        != null) stop.put("waitingTime",        r.getWaitingTime());
+                        // Sequence position
+                        stop.put("seq", i + 1);
+                    }
+                }
+
+                trip.setStopObjects(stopList);
+
+            } catch (Exception e) {
+                // Log but don't fail the whole request
+                System.err.println("Warning: could not merge stop optimisation results: " + e.getMessage());
+            }
+        }
+
         return toDTO(repo.save(trip));
     }
 

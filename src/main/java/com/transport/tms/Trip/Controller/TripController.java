@@ -3,6 +3,7 @@ package com.transport.tms.Trip.Controller;
 import com.transport.tms.Trip.Dto.TripRequestDTO;
 import com.transport.tms.Trip.Dto.TripResponseDTO;
 import com.transport.tms.Trip.Dto.TripStatusDTO;
+import com.transport.tms.Trip.Dto.OptimisationRequestDTO;
 import com.transport.tms.Trip.Service.TripService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -12,7 +13,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/trips")
@@ -61,14 +61,20 @@ public class TripController {
         return ResponseEntity.ok(service.updateStatus(id, statusDTO));
     }
 
-    /** PATCH /api/v1/trips/{id}/optimise — run optimisation */
+    /**
+     * PATCH /api/v1/trips/{id}/optimise — run optimisation and persist results
+     *
+     * Body includes:
+     *   - orderMode, startTime, endTime, travelTime, totalDistance, costs…
+     *   - stopResults[]: per-stop arrival/departure times + fromPrevDistance/TravelTime
+     *
+     * Service merges stopResults into each stop in stopObjects JSONB by docNum match.
+     */
     @PatchMapping("/{id}/optimise")
     public ResponseEntity<TripResponseDTO> optimiseTrip(
             @PathVariable Long id,
-            @RequestBody Map<String, String> body) {
-        String orderMode = body.getOrDefault("orderMode", "fixed");
-        String startTime = body.get("startTime");
-        return ResponseEntity.ok(service.optimiseTrip(id, orderMode, startTime));
+            @RequestBody OptimisationRequestDTO request) {
+        return ResponseEntity.ok(service.optimiseTrip(id, request));
     }
 
     /** DELETE /api/v1/trips/{id} */
