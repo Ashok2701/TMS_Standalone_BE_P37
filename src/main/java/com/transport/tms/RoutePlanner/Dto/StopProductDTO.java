@@ -22,7 +22,6 @@ public class StopProductDTO {
 
     // Quantities
     private BigDecimal qtyOrdered;   // ordered quantity
-    private BigDecimal qtyStockUnit; // in stock unit
     private BigDecimal qtyDelivered; // delivered quantity
     private String     stockUnit;    // STU e.g. "EA", "KG"
     private String     packUnit;     // PCU e.g. "CS", "PAL"
