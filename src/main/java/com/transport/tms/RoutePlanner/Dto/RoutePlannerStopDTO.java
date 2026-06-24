@@ -4,6 +4,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.time.LocalDate;
 
 @Getter
@@ -146,4 +147,7 @@ public class RoutePlannerStopDTO {
     private String fromTime;
 
     private String toTime;
+
+    // ── Product lines (fetched from XTMSDLVY_LINES_TMS / XTMSPICK_LINES_TMS)
+    private List<StopProductDTO> products;
 }

@@ -1,0 +1,96 @@
+package com.transport.tms.RoutePlanner.Repository;
+
+import com.transport.tms.RoutePlanner.Dto.StopProductDTO;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Repository;
+
+import java.math.BigDecimal;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.List;
+
+@Repository
+@RequiredArgsConstructor
+public class StopProductRepository {
+
+    @Qualifier("sqlServerJdbcTemplate")
+    private final JdbcTemplate jdbcTemplate;
+
+    // ── Product lines for a single delivery (DROP) ─────────────
+    public List<StopProductDTO> findDeliveryLines(String docNum) {
+        String sql = """
+            SELECT *
+            FROM   LEWISB.XTMSDLVY_LINES_TMS
+            WHERE  DOCNUM = ?
+            ORDER BY LINE_NUM
+        """;
+        return jdbcTemplate.query(sql, (rs, n) -> mapLine(rs, "DROP"), docNum);
+    }
+
+    // ── Product lines for a single pickup (PICKUP) ─────────────
+    public List<StopProductDTO> findPickupLines(String docNum) {
+        String sql = """
+            SELECT *
+            FROM   LEWISB.XTMSPICK_LINES_TMS
+            WHERE  DOCNUM = ?
+            ORDER BY LINE_NUM
+        """;
+        return jdbcTemplate.query(sql, (rs, n) -> mapLine(rs, "PICKUP"), docNum);
+    }
+
+    // ── Batch fetch for multiple docs (drops) ──────────────────
+    public List<StopProductDTO> findDeliveryLinesByDocs(List<String> docNums) {
+        if (docNums == null || docNums.isEmpty()) return List.of();
+        String placeholders = String.join(",", docNums.stream().map(d -> "?").toList());
+        String sql = """
+            SELECT *
+            FROM   LEWISB.XTMSDLVY_LINES_TMS
+            WHERE  DOCNUM IN (%s)
+            ORDER BY DOCNUM, LINE_NUM
+        """.formatted(placeholders);
+        return jdbcTemplate.query(sql, (rs, n) -> mapLine(rs, "DROP"), docNums.toArray());
+    }
+
+    // ── Batch fetch for multiple docs (pickups) ─────────────────
+    public List<StopProductDTO> findPickupLinesByDocs(List<String> docNums) {
+        if (docNums == null || docNums.isEmpty()) return List.of();
+        String placeholders = String.join(",", docNums.stream().map(d -> "?").toList());
+        String sql = """
+            SELECT *
+            FROM   LEWISB.XTMSPICK_LINES_TMS
+            WHERE  DOCNUM IN (%s)
+            ORDER BY DOCNUM, LINE_NUM
+        """.formatted(placeholders);
+        return jdbcTemplate.query(sql, (rs, n) -> mapLine(rs, "PICKUP"), docNums.toArray());
+    }
+
+    // ── Row mapper ──────────────────────────────────────────────
+    private StopProductDTO mapLine(ResultSet rs, String stopType) throws SQLException {
+        StopProductDTO dto = new StopProductDTO();
+        dto.setDocNum(rs.getString("DOCNUM"));
+        dto.setLineNum(rs.getObject("LINE_NUM", Integer.class));
+        dto.setCpyCode(rs.getString("CPYCODE"));
+        dto.setItemCode(rs.getString("ITEM_CODE"));
+        dto.setItemDesc1(rs.getString("ITEM_DESC1"));
+        dto.setItemDesc2(rs.getString("ITEM_DESC2"));
+        dto.setQtyOrdered(rs.getBigDecimal("QTY_ORDERED"));
+        dto.setQtyStockUnit(rs.getBigDecimal("QTY_STOCK_UNIT"));
+        dto.setQtyDelivered(rs.getBigDecimal("QTY_DELIVERED"));
+        dto.setStockUnit(rs.getString("STOCK_UNIT"));
+        dto.setPackUnit(rs.getString("PACK_UNIT"));
+        dto.setNetWeight(rs.getBigDecimal("NET_WEIGHT"));
+        dto.setGrossWeight(rs.getBigDecimal("GROSS_WEIGHT"));
+        dto.setVolume(rs.getBigDecimal("VOLUME"));
+        dto.setWeightUnit(rs.getString("WEIGHT_UNIT"));
+        dto.setVolumeUnit(rs.getString("VOLUME_UNIT"));
+        dto.setLot(rs.getString("LOT"));
+        dto.setSerial(rs.getString("SERIAL"));
+        try { dto.setPackNum(rs.getString("PACK_NUM")); } catch (Exception ignored) {}
+        dto.setSite(rs.getString("SITE"));
+        dto.setLineStatus(rs.getString("LINE_STATUS"));
+        dto.setStopType(stopType);
+        return dto;
+    }
+}

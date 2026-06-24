@@ -8,6 +8,8 @@ import com.transport.tms.RoutePlanner.Repository.RoutePlannerDriverRepository;
 import com.transport.tms.RoutePlanner.Repository.RoutePlannerSiteRepository;
 import com.transport.tms.RoutePlanner.Repository.RoutePlannerVehicleRepository;
 import com.transport.tms.RoutePlanner.Repository.StopEnrichmentRepository;
+import com.transport.tms.RoutePlanner.Repository.StopProductRepository;
+import com.transport.tms.RoutePlanner.Dto.StopProductDTO;
 import com.transport.tms.RoutePlanner.Repository.StopEnrichment;
 
 import com.transport.tms.RoutePlanner.Repository.X3RoutePlannerRepository;
@@ -21,6 +23,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -32,6 +36,7 @@ public class RoutePlannerServiceImpl implements RoutePlannerService {
     private final RoutePlannerDriverRepository  driverRepository;
     private final X3RoutePlannerRepository      x3Repository;
     private final StopEnrichmentRepository      enrichmentRepository;
+    private final StopProductRepository          productRepository;
 
     // ─────────────────────────────────────────────────────────
     // GET ALL TMS SITES
@@ -94,6 +99,10 @@ public class RoutePlannerServiceImpl implements RoutePlannerService {
 
         // ── 7. Enrich pickups with Postgres p-fields ──────────
         enrichStops(pickups, "PICK");
+
+        // ── 8. Load product lines for all stops (batch) ───────
+        loadProducts(drops,   "DROP");
+        loadProducts(pickups, "PICKUP");
 
         // ── 8. Build response ─────────────────────────────────
         RoutePlannerResponseDTO response = new RoutePlannerResponseDTO();

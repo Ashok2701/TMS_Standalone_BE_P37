@@ -3,6 +3,9 @@ package com.transport.tms.RoutePlanner.Controller;
 import com.transport.tms.RoutePlanner.Dto.RoutePlannerResponseDTO;
 import com.transport.tms.RoutePlanner.Dto.RoutePlannerSiteDTO;
 import com.transport.tms.RoutePlanner.Service.RoutePlannerService;
+import com.transport.tms.RoutePlanner.Dto.StopProductDTO;
+import com.transport.tms.RoutePlanner.Repository.StopProductRepository;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -16,7 +19,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class RoutePlannerController {
 
-    private final RoutePlannerService service;
+    private final RoutePlannerService   service;
+    private final StopProductRepository productRepository;
 
     // ─────────────────────────────────────────────────────────
     // GET /api/v1/route-planner/sites
@@ -49,5 +53,18 @@ public class RoutePlannerController {
 
         return ResponseEntity.ok(
                 service.loadPlannerData(siteCode, planDate));
+    }
+    /**
+     * GET /api/v1/route-planner/stop-products?docNum=X&type=DROP|PICKUP
+     * Returns all product lines for a single stop document.
+     */
+    @GetMapping("/stop-products")
+    public ResponseEntity<List<StopProductDTO>> getStopProducts(
+            @RequestParam String docNum,
+            @RequestParam(defaultValue = "DROP") String type) {
+        List<StopProductDTO> products = "DROP".equalsIgnoreCase(type)
+                ? productRepository.findDeliveryLines(docNum)
+                : productRepository.findPickupLines(docNum);
+        return ResponseEntity.ok(products);
     }
 }
