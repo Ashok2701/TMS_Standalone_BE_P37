@@ -46,7 +46,7 @@ public class X3RoutePlannerRepository {
 
         String sql = """
             SELECT *
-            FROM   TMSNEW.XTMSPICK_TMS
+            FROM   LEWISB.XTMSPICK_TMS
             WHERE  SITE    = ?
               AND  DOCDATE = ?
             ORDER BY SEQ, DOCNUM
