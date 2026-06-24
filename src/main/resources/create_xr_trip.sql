@@ -59,8 +59,8 @@ CREATE TABLE IF NOT EXISTS tms.xr_trip (
     total_cost      VARCHAR(20),
 
     -- Status / Control
-    opti_status     VARCHAR(20),
-    lock_flag       INT             DEFAULT 0,
+    status          VARCHAR(20)     DEFAULT 'Open',   -- Open | Optimised | Locked
+    locked          BOOLEAN         DEFAULT FALSE,    -- true = sent to X3 / LVS
     force_seq       INT             DEFAULT 0,
     vr_seq          VARCHAR(4),
     start_index     INT,
@@ -104,7 +104,7 @@ CREATE INDEX IF NOT EXISTS idx_xr_trip_site_date   ON tms.xr_trip (site, doc_dat
 CREATE INDEX IF NOT EXISTS idx_xr_trip_driver       ON tms.xr_trip (driver_id);
 CREATE INDEX IF NOT EXISTS idx_xr_trip_vehicle      ON tms.xr_trip (vehicle_code);
 CREATE INDEX IF NOT EXISTS idx_xr_trip_code         ON tms.xr_trip (trip_code);
-CREATE INDEX IF NOT EXISTS idx_xr_trip_status       ON tms.xr_trip (opti_status);
+CREATE INDEX IF NOT EXISTS idx_xr_trip_status       ON tms.xr_trip (status);
 CREATE INDEX IF NOT EXISTS idx_xr_trip_stop_objects ON tms.xr_trip USING gin (stop_objects);
 
 -- Auto-update update_date
