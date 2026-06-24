@@ -1,6 +1,8 @@
 package com.transport.tms.Trip.Entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import lombok.Getter;
 import lombok.Setter;
 import java.time.LocalDate;
@@ -67,10 +69,19 @@ public class XrTrip {
     @Column(name = "heu_exec",    length = 7)   private String heuExec;
     @Column(name = "dat_exec")    private OffsetDateTime datExec;
 
-    // Stored as JSON string — serialized/deserialized in service layer
-    @Column(name = "stop_objects",   columnDefinition = "jsonb") private String stopObjectsJson;
-    @Column(name = "vehicle_object", columnDefinition = "jsonb") private String vehicleObjectJson;
-    @Column(name = "total_object",   columnDefinition = "jsonb") private String totalObjectJson;
+    // JSONB columns — use @JdbcTypeCode(SqlTypes.JSON) so Hibernate
+    // passes the value through the JSON type descriptor (handles PGobject binding)
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "stop_objects",   columnDefinition = "jsonb")
+    private String stopObjectsJson;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "vehicle_object", columnDefinition = "jsonb")
+    private String vehicleObjectJson;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "total_object",   columnDefinition = "jsonb")
+    private String totalObjectJson;
 
     @Column(name = "tot_capacity",  length = 100) private String totCapacity;
     @Column(name = "tot_volume_cap",length = 100) private String totVolumeCap;
