@@ -40,8 +40,8 @@ public class TripServiceImpl implements TripService {
         trip.setStartIndex(nextSeq);
         trip.setStops((req.getDrops() == null ? 0 : req.getDrops())
                     + (req.getPickups() == null ? 0 : req.getPickups()));
-        trip.setStatus("Open");
-        trip.setLocked(false);
+        trip.setOptiStatus("Open");
+        trip.setLockFlag(0);
 
         return toDTO(repo.save(trip));
     }
@@ -83,8 +83,8 @@ public class TripServiceImpl implements TripService {
     @Override
     public TripResponseDTO updateStatus(Long id, TripStatusDTO dto) {
         XrTrip trip = findOrThrow(id);
-        if (dto.getStatus()    != null) trip.setStatus(dto.getStatus());
-        if (dto.getLocked()    != null) trip.setLocked(dto.getLocked());
+        if (dto.getOptiStatus() != null) trip.setOptiStatus(dto.getOptiStatus());
+        if (dto.getLockFlag()   != null) trip.setLockFlag(dto.getLockFlag());
         if (dto.getNotes()      != null) trip.setNotes(dto.getNotes());
         if (dto.getUserCode()   != null) trip.setUserCode(dto.getUserCode());
         return toDTO(repo.save(trip));
@@ -97,7 +97,7 @@ public class TripServiceImpl implements TripService {
         XrTrip trip = findOrThrow(id);
 
         // ── Status & settings ─────────────────────────────────
-        trip.setStatus("Optimised");
+        trip.setOptiStatus("Optimised");
         trip.setHeuExec(req.getOrderMode() != null ? req.getOrderMode() : "fixed");
         trip.setDatExec(OffsetDateTime.now());
 
@@ -276,8 +276,8 @@ public class TripServiceImpl implements TripService {
         dto.setDistanceCost(t.getDistanceCost());
         dto.setFixedCost(t.getFixedCost());
         dto.setServiceCost(t.getServiceCost());
-        dto.setStatus(t.getStatus());
-        dto.setLocked(t.getLocked());
+        dto.setOptiStatus(t.getOptiStatus());
+        dto.setLockFlag(t.getLockFlag());
         dto.setForceSeq(t.getForceSeq());
         dto.setVrSeq(t.getVrSeq());
         dto.setNotes(t.getNotes());

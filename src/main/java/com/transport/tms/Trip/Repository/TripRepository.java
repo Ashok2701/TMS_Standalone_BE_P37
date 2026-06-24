@@ -20,7 +20,7 @@ public interface TripRepository extends JpaRepository<XrTrip, Long> {
     @Query("SELECT COALESCE(MAX(t.startIndex), 0) FROM XrTrip t WHERE t.site = :site AND t.docDate = :docDate")
     int findMaxStartIndex(@Param("site") String site, @Param("docDate") LocalDate docDate);
 
-    @Query("SELECT t FROM XrTrip t WHERE t.site = :site AND t.docDate = :docDate AND t.status = :status")
+    @Query("SELECT t FROM XrTrip t WHERE t.site = :site AND t.docDate = :docDate AND t.optiStatus = :status")
     List<XrTrip> findBySiteAndDocDateAndStatus(@Param("site") String site,
                                                 @Param("docDate") LocalDate docDate,
                                                 @Param("status") String status);

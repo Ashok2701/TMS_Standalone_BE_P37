@@ -44,8 +44,8 @@ public class TripResponseDTO {
     private String   fixedCost;
     private String   serviceCost;
 
-    private String   status;     // Open | Optimised | Locked
-    private Boolean  locked;     // true = sent to X3 / LVS
+    private String   optiStatus;
+    private Integer  lockFlag;
     private Integer  forceSeq;
     private String   vrSeq;
     private String   notes;

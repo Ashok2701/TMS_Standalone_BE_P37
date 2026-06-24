@@ -4,8 +4,8 @@ import lombok.Data;
 
 @Data
 public class TripStatusDTO {
-    private String  status;       // Open | Optimised | Locked
-    private Boolean locked;       // true = lock and push to X3
+    private String  optiStatus;  // Open | Optimised | Locked
+    private Integer lockFlag;    // 1 = lock and push to X3
     private String  notes;
     private String  userCode;
 }

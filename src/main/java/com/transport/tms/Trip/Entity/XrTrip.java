@@ -61,8 +61,8 @@ public class XrTrip {
     @Column(name = "overtime_cost", length = 100) private String overtimeCost;
     @Column(name = "total_cost",     length = 20) private String totalCost;
 
-    @Column(name = "status", length = 20) private String status = "Open";   // Open | Optimised | Locked
-    @Column(name = "locked")      private Boolean locked    = false;         // true when sent to X3
+    @Column(name = "opti_status", length = 20) private String optiStatus = "Open"; // Open | Optimised | Locked
+    @Column(name = "lock_flag")   private Integer lockFlag  = 0;             // 1 = locked/sent to X3
     @Column(name = "force_seq")   private Integer forceSeq  = 0;
     @Column(name = "vr_seq",      length = 4)  private String vrSeq;
     @Column(name = "start_index") private Integer startIndex;
