@@ -51,7 +51,7 @@ public class TripResponseDTO {
     private String   notes;
     private String   generatedBy;
 
-    private Object   stopObjects;
+    private List<Object> stopObjects;
     private Object   vehicleObject;
     private Object   totalObject;
 

@@ -7,6 +7,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.time.OffsetDateTime;
 
 @Entity
@@ -71,7 +72,7 @@ public class XrTrip {
     @Column(name = "dat_exec")    private OffsetDateTime datExec;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "stop_objects",   columnDefinition = "jsonb") private Object stopObjects;
+    @Column(name = "stop_objects",   columnDefinition = "jsonb") private List<Object> stopObjects;
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "vehicle_object", columnDefinition = "jsonb") private Object vehicleObject;
     @JdbcTypeCode(SqlTypes.JSON)

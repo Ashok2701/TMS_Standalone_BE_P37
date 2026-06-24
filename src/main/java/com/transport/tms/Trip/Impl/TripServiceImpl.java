@@ -146,6 +146,7 @@ public class TripServiceImpl implements TripService {
         trip.setGeneratedBy(req.getGeneratedBy() != null ? req.getGeneratedBy() : "PLANNER");
         trip.setForceSeq(req.getForceSeq() != null ? req.getForceSeq() : 0);
         trip.setVrSeq(req.getVrSeq());
+        // stopObjects: array of all stops in order (drops + pickups)
         trip.setStopObjects(req.getStopObjects());
         trip.setVehicleObject(req.getVehicleObject());
         trip.setTotalObject(req.getTotalObject());
@@ -201,7 +202,7 @@ public class TripServiceImpl implements TripService {
         dto.setVrSeq(t.getVrSeq());
         dto.setNotes(t.getNotes());
         dto.setGeneratedBy(t.getGeneratedBy());
-        dto.setStopObjects(t.getStopObjects());
+        dto.setStopObjects(t.getStopObjects());  // List<Object>
         dto.setVehicleObject(t.getVehicleObject());
         dto.setTotalObject(t.getTotalObject());
         dto.setPerCapacity(t.getPerCapacity());
