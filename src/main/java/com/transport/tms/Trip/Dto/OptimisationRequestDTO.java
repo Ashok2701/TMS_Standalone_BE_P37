@@ -36,6 +36,8 @@ public class OptimisationRequestDTO {
 
     // ── Per-stop results — merged into stopObjects JSONB ──────
     // List must be in the same sequence order as stopObjects
+    private Object totalObject;   // totals snapshot — stored in total_object JSONB
+
     private List<StopOptimisationResult> stopResults;
 
     // ── Inner class: result for one stop ─────────────────────

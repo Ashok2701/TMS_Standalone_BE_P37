@@ -102,6 +102,8 @@ public class TripServiceImpl implements TripService {
         trip.setHeuExec(req.getOrderMode() != null ? req.getOrderMode() : "fixed");
         trip.setDatExec(OffsetDateTime.now());
 
+        // Store totalObject if provided
+        if (req.getTotalObject() != null) trip.setTotalObjectJson(toJson(req.getTotalObject()));
         if (req.getStartTime()    != null) trip.setStartTime(req.getStartTime());
         if (req.getEndTime()      != null) trip.setEndTime(req.getEndTime());
         if (req.getTravelTime()   != null) trip.setTravelTime(req.getTravelTime());
@@ -118,11 +120,12 @@ public class TripServiceImpl implements TripService {
 
         // ── Merge per-stop results into stopObjects JSONB ─────
         if (req.getStopResults() != null && !req.getStopResults().isEmpty()
-                && trip.getStopObjects() != null) {
+                && trip.getStopObjectsJson() != null) {
             try {
-                // Convert stopObjects (List<Object>) to List<Map>
+                // Parse stopObjectsJson string to List<Map>
                 List<java.util.Map<String, Object>> stopList =
-                    objectMapper.convertValue(trip.getStopObjects(),
+                    objectMapper.readValue(
+                        trip.getStopObjectsJson() != null ? trip.getStopObjectsJson() : "[]",
                         objectMapper.getTypeFactory().constructCollectionType(
                             List.class, java.util.Map.class));
 
@@ -167,7 +170,8 @@ public class TripServiceImpl implements TripService {
                     }
                 }
 
-                trip.setStopObjects(new java.util.ArrayList<>(stopList));
+                // Re-serialize updated stop list back to JSON string
+                trip.setStopObjectsJson(objectMapper.writeValueAsString(stopList));
 
             } catch (Exception e) {
                 // Log but don't fail the whole request
@@ -189,6 +193,27 @@ public class TripServiceImpl implements TripService {
     private XrTrip findOrThrow(Long id) {
         return repo.findById(id)
                 .orElseThrow(() -> new RuntimeException("Trip not found: " + id));
+    }
+
+    // ── JSON helpers ─────────────────────────────────────────
+    private String toJson(Object obj) {
+        if (obj == null) return null;
+        try { return objectMapper.writeValueAsString(obj); }
+        catch (Exception e) { return null; }
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Object> fromJsonList(String json) {
+        if (json == null || json.isBlank()) return null;
+        try { return objectMapper.readValue(json, List.class); }
+        catch (Exception e) { return null; }
+    }
+
+    @SuppressWarnings("unchecked")
+    private java.util.Map<String,Object> fromJsonMap(String json) {
+        if (json == null || json.isBlank()) return null;
+        try { return objectMapper.readValue(json, java.util.Map.class); }
+        catch (Exception e) { return null; }
     }
 
     private void mapRequestToEntity(TripRequestDTO req, XrTrip trip) {
@@ -228,9 +253,10 @@ public class TripServiceImpl implements TripService {
         trip.setForceSeq(req.getForceSeq() != null ? req.getForceSeq() : 0);
         trip.setVrSeq(req.getVrSeq());
         // stopObjects: array of all stops in order (drops + pickups)
-        trip.setStopObjects(req.getStopObjects());
-        trip.setVehicleObject(req.getVehicleObject());
-        trip.setTotalObject(req.getTotalObject());
+        // Serialize JSONB objects to JSON strings for Postgres
+        trip.setStopObjectsJson(toJson(req.getStopObjects()));
+        trip.setVehicleObjectJson(toJson(req.getVehicleObject()));
+        trip.setTotalObjectJson(toJson(req.getTotalObject()));
         trip.setTotCapacity(req.getTotCapacity());
         trip.setTotVolumeCap(req.getTotVolumeCap());
         trip.setDocCapacity(req.getDocCapacity());
@@ -283,9 +309,10 @@ public class TripServiceImpl implements TripService {
         dto.setVrSeq(t.getVrSeq());
         dto.setNotes(t.getNotes());
         dto.setGeneratedBy(t.getGeneratedBy());
-        dto.setStopObjects(t.getStopObjects());  // List<Object>
-        dto.setVehicleObject(t.getVehicleObject());
-        dto.setTotalObject(t.getTotalObject());
+        // Deserialize JSON strings back to objects for response
+        dto.setStopObjects(fromJsonList(t.getStopObjectsJson()));
+        dto.setVehicleObject(fromJsonMap(t.getVehicleObjectJson()));
+        dto.setTotalObject(fromJsonMap(t.getTotalObjectJson()));
         dto.setPerCapacity(t.getPerCapacity());
         dto.setPerVolume(t.getPerVolume());
         dto.setDocQty(t.getDocQty());
