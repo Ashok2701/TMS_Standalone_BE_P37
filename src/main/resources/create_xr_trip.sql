@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS tms.xr_trip (
     trip_id         BIGSERIAL PRIMARY KEY,
 
     -- Identity
-    trip_code       VARCHAR(60)     NOT NULL UNIQUE,   -- XVR-YYYYMMDD-SITE-N
+    trip_code       VARCHAR(60)     NOT NULL UNIQUE,   -- VR-{SITE}-{YYYYMMDD}-{001}  e.g. VR-KCC01-20260624-001
     site            VARCHAR(10)     NOT NULL,
     doc_date        DATE            NOT NULL,
 

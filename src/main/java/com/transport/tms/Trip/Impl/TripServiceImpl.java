@@ -32,10 +32,11 @@ public class TripServiceImpl implements TripService {
         XrTrip trip = new XrTrip();
         mapRequestToEntity(req, trip);
 
-        // Auto-generate trip_code: XVR-YYYYMMDD-SITE-SEQ
+        // Auto-generate trip_code: VR-{SITE}-{YYYYMMDD}-{001}
+        // e.g. VR-KCC01-20260624-001
         int nextSeq = repo.findMaxStartIndex(req.getSite(), req.getDocDate()) + 1;
         String date = req.getDocDate().format(DateTimeFormatter.BASIC_ISO_DATE);
-        String code = String.format("XVR-%s-%s-%03d", date, req.getSite(), nextSeq);
+        String code = String.format("VR-%s-%s-%03d", req.getSite(), date, nextSeq);
         trip.setTripCode(code);
         trip.setStartIndex(nextSeq);
         trip.setStops((req.getDrops() == null ? 0 : req.getDrops())
