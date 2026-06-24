@@ -167,7 +167,7 @@ public class TripServiceImpl implements TripService {
                     }
                 }
 
-                trip.setStopObjects(stopList);
+                trip.setStopObjects(new java.util.ArrayList<>(stopList));
 
             } catch (Exception e) {
                 // Log but don't fail the whole request
