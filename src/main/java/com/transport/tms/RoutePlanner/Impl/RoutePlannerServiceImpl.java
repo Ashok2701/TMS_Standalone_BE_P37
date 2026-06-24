@@ -264,4 +264,29 @@ public class RoutePlannerServiceImpl implements RoutePlannerService {
         dto.setAllowAllVehicles(d.getAllowAllVehicles());
         return dto;
     }
+    // ── 8. Batch-load product lines and attach to stops ──────
+    private void loadProducts(List<RoutePlannerStopDTO> stops, String stopType) {
+        if (stops == null || stops.isEmpty()) return;
+
+        List<String> docNums = stops.stream()
+                .map(RoutePlannerStopDTO::getDocNum)
+                .filter(d -> d != null && !d.isBlank())
+                .distinct()
+                .collect(Collectors.toList());
+
+        if (docNums.isEmpty()) return;
+
+        List<StopProductDTO> allLines = "DROP".equals(stopType)
+                ? productRepository.findDeliveryLinesByDocs(docNums)
+                : productRepository.findPickupLinesByDocs(docNums);
+
+        Map<String, List<StopProductDTO>> byDoc = allLines.stream()
+                .collect(Collectors.groupingBy(StopProductDTO::getDocNum));
+
+        for (RoutePlannerStopDTO stop : stops) {
+            stop.setProducts(byDoc.getOrDefault(stop.getDocNum(), List.of()));
+        }
+    }
+
+
 }
