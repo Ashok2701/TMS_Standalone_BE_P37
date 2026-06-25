@@ -3,13 +3,22 @@ package com.transport.tms.Sync.Customer.Dto;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Getter
 @Setter
 public class AddressTmsDTO {
 
-    // Flags
+    // ── Geo coordinates (per address) ─────────────────────────
+    private BigDecimal latitude;
+    private BigDecimal longitude;
+
+    // ── Service & waiting time (per address) ──────────────────
+    private String serviceTime;     // HH:MM
+    private String waitingTime;     // HH:MM
+
+    // ── Flags ─────────────────────────────────────────────────
     private Boolean anyTimeWindow;       // true = any time window applicable
 
     private Boolean anyVehicleCategory;  // true = any vehicle category eligible

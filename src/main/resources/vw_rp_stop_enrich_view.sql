@@ -2,74 +2,60 @@
 -- DATABASE  : PostgreSQL  (tms schema)
 -- PURPOSE   : TMS Route Planner — Postgres enrichment for stops
 --
--- THREE VIEWS:
---   1. vw_rp_dlv_enrich   — enrichment for DELIVERY stops (DLV)
---   2. vw_rp_pick_enrich  — enrichment for PICK TICKET stops (PICK)
---   3. vw_rp_stop_enrich  — UNION ALL of both (used by Spring)
---
--- JOIN KEY  : customer_code → matches X3 BPCODE
---             address_code  → matches X3 ADRESCODE
---             doc_type      → 'DLV' or 'PICK' (for filtering if needed)
+-- CHANGE    : latitude/longitude now read from xr_customer_address
+--             (was xr_customer). Each address has its own coords.
+--             service_time/waiting_time also read from address first,
+--             fallback to customer-level if address-level is null.
 -- ============================================================
 
-
--- ============================================================
--- VIEW 1 : tms.vw_rp_dlv_enrich
--- SOURCE  : XTMSDOCCONF WHERE XDOCTYP_0='SDN' AND LANNUM_0=5
---           → xr_document_config WHERE document_type = 'DLV'
--- ============================================================
 DROP VIEW IF EXISTS tms.vw_rp_stop_enrich;
 DROP VIEW IF EXISTS tms.vw_rp_dlv_enrich;
 DROP VIEW IF EXISTS tms.vw_rp_pick_enrich;
 
+-- ============================================================
+-- VIEW 1 : tms.vw_rp_dlv_enrich  (DELIVERY stops)
+-- ============================================================
 CREATE VIEW tms.vw_rp_dlv_enrich AS
 SELECT
-    -- ── Doc type identifier ───────────────────────────────────
-    'DLV'                       AS doc_type,
-
-    -- ── Join keys ─────────────────────────────────────────────
+    'DLV'                           AS doc_type,
     ca.customer_code,
     ca.address_code,
 
-    -- ── Geo (p) → replaces GPS_X / GPS_Y from X3 ─────────────
-    c.latitude,
-    c.longitude,
+    -- ── Geo — from address level (each address has own coords) ─
+    ca.latitude,
+    ca.longitude,
 
-    -- ── Service & waiting time (p) ────────────────────────────
-    -- replaces A.XX10C_SERVT_0 (BPADDRESS in X3)
-    c.service_time,
-    -- replaces A.XWAITTIME_0 (BPADDRESS in X3)
-    c.waiting_time,
+    -- ── Service & waiting time ─────────────────────────────────
+    -- Address-level overrides customer-level
+    COALESCE(ca.service_time,  c.service_time)  AS service_time,
+    COALESCE(ca.waiting_time,  c.waiting_time)  AS waiting_time,
 
-    -- ── Time windows (p) ──────────────────────────────────────
-    -- replaces BS.XFANYTIME / BS.XTANYTIME (BPDLVCUST in X3)
+    -- ── Time windows ──────────────────────────────────────────
     ca.any_time_window,
     tw.from_time,
     tw.to_time,
-    tw.display_order            AS time_window_order,
+    tw.display_order                AS time_window_order,
 
     -- ── TMS constraint flags ──────────────────────────────────
     ca.any_vehicle_category,
     ca.any_driver,
 
-    -- ── Document config (p) ───────────────────────────────────
-    -- replaces XTMSDOCCONF WHERE XDOCTYP_0='SDN' AND LANNUM_0=5
-    -- display_name_en → ROUTETAG    (DC.XROUTAG_0)
-    -- display_name_fr → ROUTETAGFRA (DC.XROUTAGFRA_0)
-    -- color_code      → ROUTECOLOR  (DC.ROUTECOLOR)
-    dc.display_name_en          AS route_tag,
-    dc.display_name_fr          AS route_tag_fra,
-    dc.color_code               AS route_color
+    -- ── Document config ───────────────────────────────────────
+    dc.display_name_en              AS route_tag,
+    dc.display_name_fr              AS route_tag_fra,
+    dc.color_code                   AS route_color
 
 FROM      tms.xr_customer_address            ca
 JOIN      tms.xr_customer                    c
     ON    c.customer_code  = ca.customer_code
 LEFT JOIN tms.xr_customer_address_timewindow tw
-    ON    tw.address_code  = ca.address_code
+    ON    tw.customer_code = ca.customer_code
+    AND   tw.address_code  = ca.address_code
     AND   tw.display_order = (
               SELECT MIN(tw2.display_order)
               FROM   tms.xr_customer_address_timewindow tw2
-              WHERE  tw2.address_code = ca.address_code
+              WHERE  tw2.customer_code = ca.customer_code
+              AND    tw2.address_code  = ca.address_code
           )
 LEFT JOIN (
     SELECT display_name_en, display_name_fr, color_code
@@ -81,52 +67,48 @@ LEFT JOIN (
 
 
 -- ============================================================
--- VIEW 2 : tms.vw_rp_pick_enrich
--- SOURCE  : XTMSDOCCONF WHERE XDOCTYP_0='BDP' AND LANNUM_0=9
---           → xr_document_config WHERE document_type = 'PICK'
+-- VIEW 2 : tms.vw_rp_pick_enrich  (PICKUP stops)
 -- ============================================================
 CREATE VIEW tms.vw_rp_pick_enrich AS
 SELECT
-    -- ── Doc type identifier ───────────────────────────────────
-    'PICK'                      AS doc_type,
-
-    -- ── Join keys ─────────────────────────────────────────────
+    'PICK'                          AS doc_type,
     ca.customer_code,
     ca.address_code,
 
-    -- ── Geo (p) ───────────────────────────────────────────────
-    c.latitude,
-    c.longitude,
+    -- ── Geo — from address level ──────────────────────────────
+    ca.latitude,
+    ca.longitude,
 
-    -- ── Service & waiting time (p) ────────────────────────────
-    c.service_time,
-    c.waiting_time,
+    -- ── Service & waiting time ────────────────────────────────
+    COALESCE(ca.service_time,  c.service_time)  AS service_time,
+    COALESCE(ca.waiting_time,  c.waiting_time)  AS waiting_time,
 
-    -- ── Time windows (p) ──────────────────────────────────────
+    -- ── Time windows ──────────────────────────────────────────
     ca.any_time_window,
     tw.from_time,
     tw.to_time,
-    tw.display_order            AS time_window_order,
+    tw.display_order                AS time_window_order,
 
     -- ── TMS constraint flags ──────────────────────────────────
     ca.any_vehicle_category,
     ca.any_driver,
 
-    -- ── Document config (p) ───────────────────────────────────
-    -- replaces XTMSDOCCONF WHERE XDOCTYP_0='BDP' AND LANNUM_0=9
-    dc.display_name_en          AS route_tag,
-    dc.display_name_fr          AS route_tag_fra,
-    dc.color_code               AS route_color
+    -- ── Document config ───────────────────────────────────────
+    dc.display_name_en              AS route_tag,
+    dc.display_name_fr              AS route_tag_fra,
+    dc.color_code                   AS route_color
 
 FROM      tms.xr_customer_address            ca
 JOIN      tms.xr_customer                    c
     ON    c.customer_code  = ca.customer_code
 LEFT JOIN tms.xr_customer_address_timewindow tw
-    ON    tw.address_code  = ca.address_code
+    ON    tw.customer_code = ca.customer_code
+    AND   tw.address_code  = ca.address_code
     AND   tw.display_order = (
               SELECT MIN(tw2.display_order)
               FROM   tms.xr_customer_address_timewindow tw2
-              WHERE  tw2.address_code = ca.address_code
+              WHERE  tw2.customer_code = ca.customer_code
+              AND    tw2.address_code  = ca.address_code
           )
 LEFT JOIN (
     SELECT display_name_en, display_name_fr, color_code
@@ -138,10 +120,7 @@ LEFT JOIN (
 
 
 -- ============================================================
--- VIEW 3 : tms.vw_rp_stop_enrich
--- UNION ALL of vw_rp_dlv_enrich + vw_rp_pick_enrich
--- This is the single view Spring queries.
--- Filter by doc_type = 'DLV' or 'PICK' as needed.
+-- VIEW 3 : tms.vw_rp_stop_enrich  (UNION — used by Spring)
 -- ============================================================
 CREATE VIEW tms.vw_rp_stop_enrich AS
 SELECT * FROM tms.vw_rp_dlv_enrich

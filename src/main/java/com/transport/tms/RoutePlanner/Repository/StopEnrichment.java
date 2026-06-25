@@ -32,14 +32,14 @@ public class StopEnrichment {
     @Column(name = "address_code")
     private String addressCode;       // matches X3 ADRESCODE
 
-    // ── Geo (p) → xr_customer ─────────────────────────────────
+    // ── Geo (p) → xr_customer_address (each address has own coords) ─
     @Column(name = "latitude")
     private BigDecimal latitude;
 
     @Column(name = "longitude")
     private BigDecimal longitude;
 
-    // ── Service / waiting time (p) → xr_customer ──────────────
+    // ── Service / waiting time (p) → xr_customer_address (address-level, falls back to xr_customer) ─
     @Column(name = "service_time")
     private String serviceTime;
 

@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -73,6 +74,21 @@ public class XRCustomerAddress {
     private LocalDateTime syncedAt;
 
     // ── TMS FIELDS (managed via TMS UI, never touched by sync) ─
+
+    // Geo coordinates — per address (each delivery address has its own lat/lon)
+    @Column(name = "latitude",  precision = 10, scale = 7)
+    private BigDecimal latitude;
+
+    @Column(name = "longitude", precision = 10, scale = 7)
+    private BigDecimal longitude;
+
+    // Service & waiting time — per address (overrides customer-level defaults)
+    @Column(name = "service_time")
+    private String serviceTime;   // HH:MM
+
+    @Column(name = "waiting_time")
+    private String waitingTime;   // HH:MM
+
     @Column(name = "any_time_window")
     private Boolean anyTimeWindow = false;
 
