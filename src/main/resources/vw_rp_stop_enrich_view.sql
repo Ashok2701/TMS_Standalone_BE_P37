@@ -27,8 +27,8 @@ SELECT
 
     -- ── Service & waiting time ─────────────────────────────────
     -- Address-level overrides customer-level
-    COALESCE(ca.service_time,  c.service_time)  AS service_time,
-    COALESCE(ca.waiting_time,  c.waiting_time)  AS waiting_time,
+    c.service_time,
+    c.waiting_time,
 
     -- ── Time windows ──────────────────────────────────────────
     ca.any_time_window,
@@ -80,8 +80,8 @@ SELECT
     ca.longitude,
 
     -- ── Service & waiting time ────────────────────────────────
-    COALESCE(ca.service_time,  c.service_time)  AS service_time,
-    COALESCE(ca.waiting_time,  c.waiting_time)  AS waiting_time,
+    c.service_time,
+    c.waiting_time,
 
     -- ── Time windows ──────────────────────────────────────────
     ca.any_time_window,

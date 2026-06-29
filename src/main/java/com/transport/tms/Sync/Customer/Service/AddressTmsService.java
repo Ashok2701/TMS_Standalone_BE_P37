@@ -32,8 +32,6 @@ public class AddressTmsService {
         AddressTmsDTO dto = new AddressTmsDTO();
         dto.setLatitude(address.getLatitude());
         dto.setLongitude(address.getLongitude());
-        dto.setServiceTime(address.getServiceTime());
-        dto.setWaitingTime(address.getWaitingTime());
         dto.setAnyTimeWindow(address.getAnyTimeWindow());
         dto.setAnyVehicleCategory(address.getAnyVehicleCategory());
         dto.setAnyDriver(address.getAnyDriver());
@@ -71,8 +69,6 @@ public class AddressTmsService {
 
         if (dto.getLatitude()    != null) address.setLatitude(dto.getLatitude());
         if (dto.getLongitude()   != null) address.setLongitude(dto.getLongitude());
-        if (dto.getServiceTime() != null) address.setServiceTime(dto.getServiceTime());
-        if (dto.getWaitingTime() != null) address.setWaitingTime(dto.getWaitingTime());
         address.setAnyTimeWindow(dto.getAnyTimeWindow());
         address.setAnyVehicleCategory(dto.getAnyVehicleCategory());
         address.setAnyDriver(dto.getAnyDriver());

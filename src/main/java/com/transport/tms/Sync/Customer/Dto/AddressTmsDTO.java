@@ -14,10 +14,6 @@ public class AddressTmsDTO {
     private BigDecimal latitude;
     private BigDecimal longitude;
 
-    // ── Service & waiting time (per address) ──────────────────
-    private String serviceTime;     // HH:MM
-    private String waitingTime;     // HH:MM
-
     // ── Flags ─────────────────────────────────────────────────
     private Boolean anyTimeWindow;       // true = any time window applicable
 

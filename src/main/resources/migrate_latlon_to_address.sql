@@ -8,24 +8,17 @@ ALTER TABLE tms.xr_customer_address
     ADD COLUMN IF NOT EXISTS latitude    NUMERIC(10,7) NULL,
     ADD COLUMN IF NOT EXISTS longitude   NUMERIC(10,7) NULL;
 
--- 2. Also add service_time and waiting_time at address level
---    (previously only on xr_customer — now per address)
-ALTER TABLE tms.xr_customer_address
-    ADD COLUMN IF NOT EXISTS service_time  VARCHAR(10) NULL,
-    ADD COLUMN IF NOT EXISTS waiting_time  VARCHAR(10) NULL;
-
 -- 3. Copy existing lat/lon from xr_customer → all its addresses
 --    (initial population — each address gets the customer's coords)
 UPDATE tms.xr_customer_address ca
 SET
     latitude      = c.latitude,
-    longitude     = c.longitude,
-    service_time  = c.service_time,
-    waiting_time  = c.waiting_time
+    longitude     = c.longitude
 FROM tms.xr_customer c
 WHERE c.customer_code = ca.customer_code
   AND c.latitude  IS NOT NULL
-  AND c.longitude IS NOT NULL;
+  AND c.longitude IS NOT NULL
+  AND (ca.latitude IS NULL OR ca.longitude IS NULL);
 
 -- 4. Index for geo queries
 CREATE INDEX IF NOT EXISTS idx_xr_cust_addr_latlon

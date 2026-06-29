@@ -82,13 +82,6 @@ public class XRCustomerAddress {
     @Column(name = "longitude", precision = 10, scale = 7)
     private BigDecimal longitude;
 
-    // Service & waiting time — per address (overrides customer-level defaults)
-    @Column(name = "service_time")
-    private String serviceTime;   // HH:MM
-
-    @Column(name = "waiting_time")
-    private String waitingTime;   // HH:MM
-
     @Column(name = "any_time_window")
     private Boolean anyTimeWindow = false;
 
