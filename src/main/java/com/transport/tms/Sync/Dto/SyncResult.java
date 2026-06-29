@@ -1,31 +1,33 @@
 package com.transport.tms.Sync.Dto;
 
-
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 
-
 @Getter
-@AllArgsConstructor
 public class SyncResult {
 
+    private final Integer x3Count;
+    private final Integer beforeCount;
+    private final Integer afterCount;
+    private final Integer inserted;
+    private final Integer updated;
+    private final Integer failed;
+    private final Integer deactivated;
 
-    private Integer x3Count;
+    // Constructor with deactivated (new)
+    public SyncResult(Integer x3Count, Integer beforeCount, Integer afterCount,
+                      Integer inserted, Integer updated, Integer failed, Integer deactivated) {
+        this.x3Count      = x3Count;
+        this.beforeCount  = beforeCount;
+        this.afterCount   = afterCount;
+        this.inserted     = inserted;
+        this.updated      = updated;
+        this.failed       = failed;
+        this.deactivated  = deactivated;
+    }
 
-
-    private Integer beforeCount;
-
-
-    private Integer afterCount;
-
-
-    private Integer inserted;
-
-
-    private Integer updated;
-
-
-    private Integer failed;
-
-
+    // Backward-compatible constructor (deactivated defaults to 0)
+    public SyncResult(Integer x3Count, Integer beforeCount, Integer afterCount,
+                      Integer inserted, Integer updated, Integer failed) {
+        this(x3Count, beforeCount, afterCount, inserted, updated, failed, 0);
+    }
 }

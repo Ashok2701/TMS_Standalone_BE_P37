@@ -73,6 +73,9 @@ public class XRCustomerAddress {
     @Column(name = "synced_at")
     private LocalDateTime syncedAt;
 
+    @Column(name = "active")
+    private Boolean active = true;   // false = deleted in X3, kept for history
+
     // ── TMS FIELDS (managed via TMS UI, never touched by sync) ─
 
     // Geo coordinates — per address (each delivery address has its own lat/lon)

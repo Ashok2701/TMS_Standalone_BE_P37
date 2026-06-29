@@ -77,11 +77,31 @@ public class ProductSyncService {
             }
         }
 
+        // ── DEACTIVATE products no longer in X3 ─────────────
+        java.util.Set<String> x3Codes = products.stream()
+                .map(X3ProductDTO::getProductCode)
+                .collect(java.util.stream.Collectors.toSet());
+
+        int deactivated = 0;
+        for (Map.Entry<String, XRProduct> entry : existingMap.entrySet()) {
+            if (!x3Codes.contains(entry.getKey())) {
+                XRProduct gone = entry.getValue();
+                if (Boolean.TRUE.equals(gone.getActive())) {
+                    gone.setActive(false);
+                    gone.setSyncedAt(java.time.LocalDateTime.now());
+                    productRepository.save(gone);
+                    deactivated++;
+                    System.out.println("DEACTIVATED product: " + gone.getProductCode());
+                }
+            }
+        }
+
         Integer after = (int) productRepository.count();
 
         System.out.println("PRODUCT SYNC DONE — inserted=" + inserted
                 + " updated=" + updated
-                + " skipped=" + skipped);
+                + " skipped=" + skipped
+                + " deactivated=" + deactivated);
 
         return new SyncResult(x3Count, before, after, inserted, updated, 0);
     }

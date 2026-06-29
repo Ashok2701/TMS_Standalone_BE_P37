@@ -92,6 +92,25 @@ public class SiteSyncService {
             }
         }
 
+        // ── DEACTIVATE sites no longer in X3 ────────────────
+        java.util.Set<String> x3Codes = sites.stream()
+                .map(X3SiteDTO::getSiteCode)
+                .collect(java.util.stream.Collectors.toSet());
+
+        int deactivated = 0;
+        for (Map.Entry<String, XRSite> entry : existingMap.entrySet()) {
+            if (!x3Codes.contains(entry.getKey())) {
+                XRSite gone = entry.getValue();
+                if (!Boolean.FALSE.equals(gone.getActive())) {
+                    gone.setActive(false);
+                    gone.setSyncedAt(java.time.LocalDateTime.now());
+                    repository.save(gone);
+                    deactivated++;
+                    System.out.println("DEACTIVATED site: " + gone.getSiteCode());
+                }
+            }
+        }
+
         Integer after = (int) repository.count();
 
         System.out.println("SYNC DONE — inserted=" + inserted

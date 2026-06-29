@@ -115,11 +115,13 @@ public class SyncServiceImpl implements SyncService {
             history.setInsertedCount(result.getInserted());
             history.setUpdatedCount(result.getUpdated());
             history.setFailedCount(result.getFailed());
+            // history.setDeactivatedCount(result.getDeactivated()); // add column if needed
             history.setStatus(result.getFailed() == 0 ? "SUCCESS" : "PARTIAL");
 
             System.out.println("SYNC COMPLETED : " + objectCode.toUpperCase()
                     + " inserted=" + result.getInserted()
                     + " updated=" + result.getUpdated()
+                    + " deactivated=" + result.getDeactivated()
                     + " failed=" + result.getFailed());
 
         } catch (Exception e) {

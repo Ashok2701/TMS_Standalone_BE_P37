@@ -80,6 +80,25 @@ public class CustomerAddressSyncService {
             }
         }
 
+        // ── DEACTIVATE addresses no longer in X3 ────────────
+        java.util.Set<String> x3Keys = addresses.stream()
+                .map(dto -> dto.getCustomerCode() + "::" + dto.getAddressCode())
+                .collect(java.util.stream.Collectors.toSet());
+
+        int deactivated = 0;
+        for (Map.Entry<String, XRCustomerAddress> entry : existingMap.entrySet()) {
+            if (!x3Keys.contains(entry.getKey())) {
+                XRCustomerAddress gone = entry.getValue();
+                if (!Boolean.FALSE.equals(gone.getActive())) {
+                    gone.setActive(false);
+                    gone.setSyncedAt(java.time.LocalDateTime.now());
+                    addressRepository.save(gone);
+                    deactivated++;
+                    System.out.println("DEACTIVATED address: " + entry.getKey());
+                }
+            }
+        }
+
         Integer after = (int) addressRepository.count();
 
         System.out.println("CUSTOMER ADDRESS SYNC DONE — inserted=" + inserted

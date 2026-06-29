@@ -77,11 +77,32 @@ public class CustomerSyncService {
             }
         }
 
+        // ── DEACTIVATE records no longer in X3 ─────────────
+        // Build set of all codes that came from X3 this sync
+        java.util.Set<String> x3Codes = customers.stream()
+                .map(X3CustomerDTO::getCustomerCode)
+                .collect(java.util.stream.Collectors.toSet());
+
+        int deactivated = 0;
+        for (Map.Entry<String, XRCustomer> entry : existingMap.entrySet()) {
+            if (!x3Codes.contains(entry.getKey())) {
+                XRCustomer gone = entry.getValue();
+                if (Boolean.TRUE.equals(gone.getActive())) {
+                    gone.setActive(false);
+                    gone.setSyncedAt(java.time.LocalDateTime.now());
+                    customerRepository.save(gone);
+                    deactivated++;
+                    System.out.println("DEACTIVATED customer: " + gone.getCustomerCode());
+                }
+            }
+        }
+
         Integer after = (int) customerRepository.count();
 
         System.out.println("CUSTOMER SYNC DONE — inserted=" + inserted
                 + " updated=" + updated
-                + " skipped=" + skipped);
+                + " skipped=" + skipped
+                + " deactivated=" + deactivated);
 
         return new SyncResult(x3Count, before, after, inserted, updated, 0);
     }

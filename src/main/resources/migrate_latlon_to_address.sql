@@ -27,3 +27,17 @@ CREATE INDEX IF NOT EXISTS idx_xr_cust_addr_latlon
 
 -- NOTE: Keep lat/lon on xr_customer as well for now (backward compat)
 -- They can be removed later once all addresses are individually geocoded.
+
+-- ============================================================
+-- Add active column to xr_customer_address and xr_site
+-- (for soft-delete when record removed from X3)
+-- ============================================================
+ALTER TABLE tms.xr_customer_address
+    ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT TRUE;
+
+ALTER TABLE tms.xr_site
+    ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT TRUE;
+
+-- Set all existing records as active
+UPDATE tms.xr_customer_address SET active = TRUE WHERE active IS NULL;
+UPDATE tms.xr_site              SET active = TRUE WHERE active IS NULL;
