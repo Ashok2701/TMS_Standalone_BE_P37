@@ -3,6 +3,7 @@ package com.transport.tms.Sync.Customer.Dto;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -32,6 +33,10 @@ public class CustomerAddressDetailDTO {
     private String webSite;
     private Boolean defaultAddress;
     private LocalDateTime syncedAt;
+
+    // ── TMS geo (editable) ─────────────────────────────────────
+    private BigDecimal latitude;
+    private BigDecimal longitude;
 
     // ── TMS flags (editable) ──────────────────────────────────
     private Boolean anyTimeWindow;      // true = visit at any time

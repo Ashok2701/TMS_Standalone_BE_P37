@@ -106,6 +106,10 @@ public class CustomerManagementService {
                                 new RuntimeException(
                                         "Address not found: " + customerCode + "/" + addressCode));
 
+        // TMS geo — only overwrite if provided (avoid wiping on partial save)
+        if (dto.getLatitude()  != null) address.setLatitude(dto.getLatitude());
+        if (dto.getLongitude() != null) address.setLongitude(dto.getLongitude());
+
         // TMS flags
         address.setAnyTimeWindow(dto.getAnyTimeWindow());
         address.setAnyVehicleCategory(dto.getAnyVehicleCategory());
@@ -203,6 +207,8 @@ public class CustomerManagementService {
         dto.setWebSite(a.getWebSite());
         dto.setDefaultAddress(a.getDefaultAddress());
         dto.setSyncedAt(a.getSyncedAt());
+        dto.setLatitude(a.getLatitude());
+        dto.setLongitude(a.getLongitude());
         dto.setAnyTimeWindow(a.getAnyTimeWindow());
         dto.setAnyVehicleCategory(a.getAnyVehicleCategory());
         dto.setAnyDriver(a.getAnyDriver());
