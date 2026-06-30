@@ -34,9 +34,15 @@ public class DriverController {
         return service.getById(driverId);
     }
 
-    // Returns drivers from X3 (SQL Server) — has actual data
+    // Returns full TMS driver detail (license, status, hours, etc.)
     @GetMapping
-    public List<DropdownData> getAll() {
+    public List<DriverDTO> getAll() {
+        return service.getAll();
+    }
+
+    // X3 raw dropdown values (value/label only) — kept for legacy dropdowns
+    @GetMapping("/x3-list")
+    public List<DropdownData> getX3List() {
         return commonRepository.getDriverList();
     }
 

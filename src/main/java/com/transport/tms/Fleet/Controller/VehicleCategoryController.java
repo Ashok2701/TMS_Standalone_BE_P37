@@ -34,9 +34,15 @@ public class VehicleCategoryController {
         return service.getById(categoryCode);
     }
 
-    // Returns vehicle classes from X3 (SQL Server) — has actual data
+    // Returns full TMS vehicle category detail (capacity, dimensions, etc.)
     @GetMapping
-    public List<DropdownData> getAll() {
+    public List<VehicleCategoryDTO> getAll() {
+        return service.getAll();
+    }
+
+    // X3 raw dropdown values (value/label only) — kept for legacy dropdowns
+    @GetMapping("/x3-classes")
+    public List<DropdownData> getX3Classes() {
         return commonRepository.getVehicleClassList();
     }
 
