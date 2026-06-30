@@ -7,27 +7,30 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
-
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * All queries here target X3 tables (FACILITY, BPCARRIER, XX10CDRIVER, etc.)
- * which live in SQL Server (tbs / LEWISB schema) — NOT Postgres.
- * Uses sqlServerJdbcTemplate, never the default JPA EntityManager.
+ * Most queries here target X3 tables (FACILITY, BPCARRIER, XX10CCLASS, etc.)
+ * which live in SQL Server (tbs / LEWISB schema) via sqlServerJdbcTemplate.
+ *
+ * EXCEPTION: driver lists use Postgres tms.xr_driver (TMS master data,
+ * synced separately) instead of X3's XX10CDRIVER.
  */
 @Repository
 public class CommonRepository {
 
     private final JdbcTemplate sqlServerJdbc;
+    private final DriverRepository driverRepository;
 
     @Value("${x3.schema}")
     private String dbSchema;   // X3 schema, e.g. "LEWISB" — separate from Postgres db.schema
 
-    public CommonRepository(@Qualifier("sqlServerJdbcTemplate") JdbcTemplate sqlServerJdbc) {
+    public CommonRepository(@Qualifier("sqlServerJdbcTemplate") JdbcTemplate sqlServerJdbc,
+                            DriverRepository driverRepository) {
         this.sqlServerJdbc = sqlServerJdbc;
+        this.driverRepository = driverRepository;
     }
 
     private List<DropdownData> queryDropdown(String sql) {
@@ -106,9 +109,15 @@ public class CommonRepository {
             "where CODFIC_0 = 'TABUNIT' and LANGUE_0='ENG' and ZONE_0='DES'");
     }
 
+    // Uses Postgres tms.xr_driver (TMS master data) instead of X3 XX10CDRIVER
     public List<DropdownData> getDriverList() {
-        return queryDropdown(
-            "select DRIVERID_0, DRIVER_0 from " + dbSchema + ".XX10CDRIVER order by DRIVERID_0");
+        return driverRepository.findAll().stream()
+                .filter(d -> Boolean.TRUE.equals(d.getActive()))
+                .map(d -> new DropdownData(
+                        d.getDriverId()   != null ? d.getDriverId()   : "",
+                        d.getDriverName() != null ? d.getDriverName() : ""))
+                .sorted((a, b) -> String.valueOf(a.getValue()).compareTo(String.valueOf(b.getValue())))
+                .toList();
     }
 
     public List<DropdownData> getCustomerList() {
@@ -161,17 +170,20 @@ public class CommonRepository {
         });
     }
 
+    // Uses Postgres tms.xr_driver instead of X3 XX10CDRIVER
     public List<Map<String, Object>> getDriverData() {
-        String sql = "select DRIVERID_0, DRIVER_0, MOB_0, LICETYP_0, LICENUM_0, FCY_0 from " + dbSchema + ".XX10CDRIVER";
-        return sqlServerJdbc.query(sql, (rs, n) -> {
-            Map<String, Object> m = new HashMap<>();
-            m.put("driverId",    rs.getObject("DRIVERID_0"));
-            m.put("driverName",  rs.getObject("DRIVER_0"));
-            m.put("mobile",      rs.getObject("MOB_0"));
-            m.put("licenseType", rs.getObject("LICETYP_0"));
-            m.put("licenseNum",  rs.getObject("LICENUM_0"));
-            m.put("site",        rs.getObject("FCY_0"));
-            return m;
-        });
+        return driverRepository.findAll().stream()
+                .filter(d -> Boolean.TRUE.equals(d.getActive()))
+                .map(d -> {
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("driverId",    d.getDriverId());
+                    m.put("driverName",  d.getDriverName());
+                    m.put("mobile",      d.getMobileNo());
+                    m.put("licenseType", d.getLicenseType());
+                    m.put("licenseNum",  d.getLicenseNumber());
+                    m.put("site",        null); // not on Driver entity
+                    return m;
+                })
+                .toList();
     }
 }
