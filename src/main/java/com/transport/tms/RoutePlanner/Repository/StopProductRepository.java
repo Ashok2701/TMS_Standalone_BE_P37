@@ -14,12 +14,18 @@ import java.util.Collections;
 import java.util.List;
 
 @Repository
-@RequiredArgsConstructor
 public class StopProductRepository {
 
-    @Qualifier("sqlServerJdbcTemplate")
     private final JdbcTemplate jdbcTemplate;
     private final SchemaConfig schemas;
+
+    public StopProductRepository(
+            @org.springframework.beans.factory.annotation.Qualifier("sqlServerJdbcTemplate")
+            JdbcTemplate jdbcTemplate,
+            SchemaConfig schemas) {
+        this.jdbcTemplate = jdbcTemplate;
+        this.schemas = schemas;
+    }
 
     // ── Single delivery (DROP) ─────────────────────────────────
     public List<StopProductDTO> findDeliveryLines(String docNum) {

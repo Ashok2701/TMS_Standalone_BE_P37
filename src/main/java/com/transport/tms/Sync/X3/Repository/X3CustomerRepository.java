@@ -11,11 +11,17 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
-@RequiredArgsConstructor
 public class X3CustomerRepository {
 
-    @Qualifier("sqlServerJdbcTemplate")
     private final JdbcTemplate jdbcTemplate;
+    private final SchemaConfig schemas;
+
+    public X3CustomerRepository(
+            @Qualifier("sqlServerJdbcTemplate") JdbcTemplate jdbcTemplate,
+            SchemaConfig schemas) {
+        this.jdbcTemplate = jdbcTemplate;
+        this.schemas = schemas;
+    }
 
     public Integer count() {
 

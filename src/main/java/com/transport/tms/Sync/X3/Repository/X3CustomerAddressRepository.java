@@ -16,10 +16,14 @@ public class X3CustomerAddressRepository {
     private final SchemaConfig schemas;
 
     public X3CustomerAddressRepository(
-            @Qualifier("sqlServerJdbcTemplate")
-            JdbcTemplate jdbcTemplate) {
+            @Qualifier("sqlServerJdbcTemplate",
+            SchemaConfig schemas)
+            JdbcTemplate jdbcTemplate,
+            SchemaConfig schemas) {
 
         this.jdbcTemplate = jdbcTemplate;
+    
+        this.schemas = schemas;
     }
 
     // COUNT must match exactly what findCustomerAddresses() fetches

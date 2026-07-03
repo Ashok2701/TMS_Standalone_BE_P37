@@ -16,10 +16,14 @@ public class X3ProductRepository {
     private final SchemaConfig schemas;
 
     public X3ProductRepository(
-            @Qualifier("sqlServerJdbcTemplate")
-            JdbcTemplate jdbcTemplate) {
+            @Qualifier("sqlServerJdbcTemplate",
+            SchemaConfig schemas)
+            JdbcTemplate jdbcTemplate,
+            SchemaConfig schemas) {
 
         this.jdbcTemplate = jdbcTemplate;
+    
+        this.schemas = schemas;
     }
 
     public Integer count() {

@@ -15,12 +15,18 @@ import java.time.LocalDate;
 import java.util.List;
 
 @Repository
-@RequiredArgsConstructor
 public class X3RoutePlannerRepository {
 
-    @Qualifier("sqlServerJdbcTemplate")
     private final JdbcTemplate jdbcTemplate;
     private final SchemaConfig schemas;
+
+    public X3RoutePlannerRepository(
+            @org.springframework.beans.factory.annotation.Qualifier("sqlServerJdbcTemplate")
+            JdbcTemplate jdbcTemplate,
+            SchemaConfig schemas) {
+        this.jdbcTemplate = jdbcTemplate;
+        this.schemas = schemas;
+    }
 
     // ─────────────────────────────────────────────────────────
     // DROPS  —  " + schemas.getX3Schema() + ".XTMSDLVY_TMS

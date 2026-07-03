@@ -22,12 +22,16 @@ public class X3SiteRepository {
 
 
     public X3SiteRepository(
-            @Qualifier("sqlServerJdbcTemplate")
+            @Qualifier("sqlServerJdbcTemplate",
+            SchemaConfig schemas)
             JdbcTemplate jdbcTemplate
-    ){
+    ,
+            SchemaConfig schemas){
 
         this.jdbcTemplate = jdbcTemplate;
 
+    
+        this.schemas = schemas;
     }
 
 
