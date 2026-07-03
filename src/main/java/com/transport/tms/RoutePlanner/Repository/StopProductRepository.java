@@ -20,8 +20,7 @@ public class StopProductRepository {
     private final SchemaConfig schemas;
 
     public StopProductRepository(
-            @org.springframework.beans.factory.annotation.Qualifier("sqlServerJdbcTemplate")
-            JdbcTemplate jdbcTemplate,
+            @Qualifier("sqlServerJdbcTemplate") JdbcTemplate jdbcTemplate,
             SchemaConfig schemas) {
         this.jdbcTemplate = jdbcTemplate;
         this.schemas = schemas;

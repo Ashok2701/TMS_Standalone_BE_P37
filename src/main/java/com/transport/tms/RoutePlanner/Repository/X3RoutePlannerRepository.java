@@ -21,8 +21,7 @@ public class X3RoutePlannerRepository {
     private final SchemaConfig schemas;
 
     public X3RoutePlannerRepository(
-            @org.springframework.beans.factory.annotation.Qualifier("sqlServerJdbcTemplate")
-            JdbcTemplate jdbcTemplate,
+            @Qualifier("sqlServerJdbcTemplate") JdbcTemplate jdbcTemplate,
             SchemaConfig schemas) {
         this.jdbcTemplate = jdbcTemplate;
         this.schemas = schemas;

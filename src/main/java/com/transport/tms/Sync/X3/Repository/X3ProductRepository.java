@@ -16,13 +16,9 @@ public class X3ProductRepository {
     private final SchemaConfig schemas;
 
     public X3ProductRepository(
-            @Qualifier("sqlServerJdbcTemplate",
-            SchemaConfig schemas)
-            JdbcTemplate jdbcTemplate,
+            @Qualifier("sqlServerJdbcTemplate") JdbcTemplate jdbcTemplate,
             SchemaConfig schemas) {
-
         this.jdbcTemplate = jdbcTemplate;
-    
         this.schemas = schemas;
     }
 

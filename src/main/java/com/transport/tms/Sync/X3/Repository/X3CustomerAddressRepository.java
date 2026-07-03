@@ -16,13 +16,9 @@ public class X3CustomerAddressRepository {
     private final SchemaConfig schemas;
 
     public X3CustomerAddressRepository(
-            @Qualifier("sqlServerJdbcTemplate",
-            SchemaConfig schemas)
-            JdbcTemplate jdbcTemplate,
+            @Qualifier("sqlServerJdbcTemplate") JdbcTemplate jdbcTemplate,
             SchemaConfig schemas) {
-
         this.jdbcTemplate = jdbcTemplate;
-    
         this.schemas = schemas;
     }
 
