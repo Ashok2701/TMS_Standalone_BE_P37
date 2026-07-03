@@ -1,5 +1,7 @@
 package com.transport.tms.Sync.X3.Repository;
 
+import com.transport.tms.Config.SchemaConfig;
+
 import com.transport.tms.Sync.X3.Dto.X3CustomerAddressDTO;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -11,6 +13,7 @@ import java.util.List;
 public class X3CustomerAddressRepository {
 
     private final JdbcTemplate jdbcTemplate;
+    private final SchemaConfig schemas;
 
     public X3CustomerAddressRepository(
             @Qualifier("sqlServerJdbcTemplate")
@@ -25,8 +28,8 @@ public class X3CustomerAddressRepository {
 
         String sql = """
             SELECT COUNT(*)
-            FROM LEWISB.BPADDRESS A
-            INNER JOIN LEWISB.BPCUSTOMER C
+            FROM " + schemas.getX3Schema() + ".BPADDRESS A
+            INNER JOIN " + schemas.getX3Schema() + ".BPCUSTOMER C
                 ON A.BPANUM_0 = C.BPCNUM_0
         """;
 
@@ -55,8 +58,8 @@ public class X3CustomerAddressRepository {
                 A.MOB_0,
                 A.WEB_0,
                 CASE WHEN C.BPAADD_0 = A.BPAADD_0 THEN 1 ELSE 0 END AS IS_DEFAULT
-            FROM LEWISB.BPADDRESS A
-            INNER JOIN LEWISB.BPCUSTOMER C
+            FROM " + schemas.getX3Schema() + ".BPADDRESS A
+            INNER JOIN " + schemas.getX3Schema() + ".BPCUSTOMER C
                 ON A.BPANUM_0 = C.BPCNUM_0
             ORDER BY C.BPCNUM_0, IS_DEFAULT DESC
         """;

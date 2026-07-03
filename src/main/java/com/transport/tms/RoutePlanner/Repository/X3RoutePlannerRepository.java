@@ -1,5 +1,7 @@
 package com.transport.tms.RoutePlanner.Repository;
 
+import com.transport.tms.Config.SchemaConfig;
+
 import com.transport.tms.RoutePlanner.Dto.RoutePlannerStopDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -18,16 +20,17 @@ public class X3RoutePlannerRepository {
 
     @Qualifier("sqlServerJdbcTemplate")
     private final JdbcTemplate jdbcTemplate;
+    private final SchemaConfig schemas;
 
     // ─────────────────────────────────────────────────────────
-    // DROPS  —  LEWISB.XTMSDLVY_TMS
+    // DROPS  —  " + schemas.getX3Schema() + ".XTMSDLVY_TMS
     // ─────────────────────────────────────────────────────────
     public List<RoutePlannerStopDTO> findDropsByDateAndSite(
             String siteCode, LocalDate planDate) {
 
         String sql = """
             SELECT *
-            FROM   LEWISB.XTMSDLVY_TMS
+            FROM   " + schemas.getX3Schema() + ".XTMSDLVY_TMS
             WHERE  SITE    = ?
               AND  DOCDATE = ?
             ORDER BY SEQ, DOCNUM
@@ -46,7 +49,7 @@ public class X3RoutePlannerRepository {
 
         String sql = """
             SELECT *
-            FROM   LEWISB.XTMSPICK_TMS
+            FROM   " + schemas.getX3Schema() + ".XTMSPICK_TMS
             WHERE  SITE    = ?
               AND  DOCDATE = ?
             ORDER BY SEQ, DOCNUM

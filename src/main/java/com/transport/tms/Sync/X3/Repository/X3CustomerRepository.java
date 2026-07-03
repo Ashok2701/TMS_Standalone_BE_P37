@@ -1,5 +1,7 @@
 package com.transport.tms.Sync.X3.Repository;
 
+import com.transport.tms.Config.SchemaConfig;
+
 import com.transport.tms.Sync.X3.Dto.X3CustomerDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -19,7 +21,7 @@ public class X3CustomerRepository {
 
         String sql = """
             SELECT COUNT(*)
-            FROM LEWISB.BPCUSTOMER
+            FROM " + schemas.getX3Schema() + ".BPCUSTOMER
         """;
 
         Integer count = jdbcTemplate.queryForObject(sql, Integer.class);
@@ -37,7 +39,7 @@ public class X3CustomerRepository {
                                                           BCGCOD_0 AS  CRY_0,
                                                           CUR_0
                 
-                                                      FROM LEWISB.BPCUSTOMER
+                                                      FROM " + schemas.getX3Schema() + ".BPCUSTOMER
         """;
 
         List<X3CustomerDTO> result = jdbcTemplate.query(

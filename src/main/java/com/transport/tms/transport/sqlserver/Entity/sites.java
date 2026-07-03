@@ -11,6 +11,7 @@ import lombok.Setter;
 @Getter
     @Setter
     @Entity
+    // NOTE: schema must match x3.schema in application.properties
     @Table(name = "\"XTMSUSRFCY\"", schema = "\"LEWISB\"")
     public class sites {
 

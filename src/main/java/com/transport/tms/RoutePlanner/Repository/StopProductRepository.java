@@ -1,5 +1,7 @@
 package com.transport.tms.RoutePlanner.Repository;
 
+import com.transport.tms.Config.SchemaConfig;
+
 import com.transport.tms.RoutePlanner.Dto.StopProductDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -17,16 +19,17 @@ public class StopProductRepository {
 
     @Qualifier("sqlServerJdbcTemplate")
     private final JdbcTemplate jdbcTemplate;
+    private final SchemaConfig schemas;
 
     // ── Single delivery (DROP) ─────────────────────────────────
     public List<StopProductDTO> findDeliveryLines(String docNum) {
-        String sql = "SELECT * FROM LEWISB.XTMSDLVY_LINES_TMS WHERE DOCNUM = ? ORDER BY LINE_NUM";
+        String sql = "SELECT * FROM " + schemas.getX3Schema() + ".XTMSDLVY_LINES_TMS WHERE DOCNUM = ? ORDER BY LINE_NUM";
         return jdbcTemplate.query(sql, (rs, n) -> mapRow(rs, "DROP"), docNum);
     }
 
     // ── Single pickup (PICKUP) ─────────────────────────────────
     public List<StopProductDTO> findPickupLines(String docNum) {
-        String sql = "SELECT * FROM LEWISB.XTMSPICK_LINES_TMS WHERE DOCNUM = ? ORDER BY LINE_NUM";
+        String sql = "SELECT * FROM " + schemas.getX3Schema() + ".XTMSPICK_LINES_TMS WHERE DOCNUM = ? ORDER BY LINE_NUM";
         return jdbcTemplate.query(sql, (rs, n) -> mapRow(rs, "PICKUP"), docNum);
     }
 
@@ -34,7 +37,7 @@ public class StopProductRepository {
     public List<StopProductDTO> findDeliveryLinesByDocs(List<String> docNums) {
         if (docNums == null || docNums.isEmpty()) return Collections.emptyList();
         String placeholders = String.join(",", Collections.nCopies(docNums.size(), "?"));
-        String sql = "SELECT * FROM LEWISB.XTMSDLVY_LINES_TMS WHERE DOCNUM IN ("
+        String sql = "SELECT * FROM " + schemas.getX3Schema() + ".XTMSDLVY_LINES_TMS WHERE DOCNUM IN ("
                    + placeholders + ") ORDER BY DOCNUM, LINE_NUM";
         return jdbcTemplate.query(sql, (rs, n) -> mapRow(rs, "DROP"), docNums.toArray());
     }
@@ -43,7 +46,7 @@ public class StopProductRepository {
     public List<StopProductDTO> findPickupLinesByDocs(List<String> docNums) {
         if (docNums == null || docNums.isEmpty()) return Collections.emptyList();
         String placeholders = String.join(",", Collections.nCopies(docNums.size(), "?"));
-        String sql = "SELECT * FROM LEWISB.XTMSPICK_LINES_TMS WHERE DOCNUM IN ("
+        String sql = "SELECT * FROM " + schemas.getX3Schema() + ".XTMSPICK_LINES_TMS WHERE DOCNUM IN ("
                    + placeholders + ") ORDER BY DOCNUM, LINE_NUM";
         return jdbcTemplate.query(sql, (rs, n) -> mapRow(rs, "PICKUP"), docNums.toArray());
     }

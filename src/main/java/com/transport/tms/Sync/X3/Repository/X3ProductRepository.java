@@ -1,5 +1,7 @@
 package com.transport.tms.Sync.X3.Repository;
 
+import com.transport.tms.Config.SchemaConfig;
+
 import com.transport.tms.Sync.X3.Dto.X3ProductDTO;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -11,6 +13,7 @@ import java.util.List;
 public class X3ProductRepository {
 
     private final JdbcTemplate jdbcTemplate;
+    private final SchemaConfig schemas;
 
     public X3ProductRepository(
             @Qualifier("sqlServerJdbcTemplate")
@@ -25,7 +28,7 @@ public class X3ProductRepository {
         // Each item has one row per company (CPY_0)
         String sql = """
             SELECT COUNT(DISTINCT ITMREF_0)
-            FROM LEWISB.ITMMASTER
+            FROM " + schemas.getX3Schema() + ".ITMMASTER
         """;
 
         Integer count = jdbcTemplate.queryForObject(sql, Integer.class);
@@ -52,7 +55,7 @@ public class X3ProductRepository {
                                  ISNULL(M.WEU_0, '')       AS WEU_0,
                                  ISNULL(M.VOU_0, '')       AS VOU_0,
                                  ISNULL(M.DLVFLG_0, 2)     AS ENAFLG_0
-                             FROM LEWISB.ITMMASTER M
+                             FROM " + schemas.getX3Schema() + ".ITMMASTER M
         """;
 
         List<X3ProductDTO> result = jdbcTemplate.query(

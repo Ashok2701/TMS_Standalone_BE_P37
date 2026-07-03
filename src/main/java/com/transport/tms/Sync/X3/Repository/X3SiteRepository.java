@@ -1,5 +1,7 @@
 package com.transport.tms.Sync.X3.Repository;
 
+import com.transport.tms.Config.SchemaConfig;
+
 
 import com.transport.tms.Sync.X3.Dto.X3SiteDTO;
 
@@ -15,6 +17,7 @@ public class X3SiteRepository {
 
 
     private final JdbcTemplate jdbcTemplate;
+    private final SchemaConfig schemas;
 
 
 
@@ -36,7 +39,7 @@ public class X3SiteRepository {
         String sql = """
 
             SELECT COUNT(*)
-            FROM LEWISB.FACILITY
+            FROM " + schemas.getX3Schema() + ".FACILITY
 
         """;
 
@@ -88,9 +91,9 @@ public class X3SiteRepository {
         A.SAT_0,
         A.CRYNAM_0
 
-        FROM LEWISB.FACILITY F
+        FROM " + schemas.getX3Schema() + ".FACILITY F
 
-        LEFT JOIN LEWISB.BPADDRESS A
+        LEFT JOIN " + schemas.getX3Schema() + ".BPADDRESS A
 
         ON F.BPAADD_0 = A.BPAADD_0
 
