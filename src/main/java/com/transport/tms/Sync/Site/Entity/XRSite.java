@@ -77,6 +77,9 @@ public class XRSite {
     @Column(name="synced_at")
     private LocalDateTime syncedAt;
 
+    @Column(name="active")
+    private Boolean active = true;
+
 
 
     // ======================
