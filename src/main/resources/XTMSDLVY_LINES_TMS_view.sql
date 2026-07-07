@@ -2,15 +2,15 @@ USE [tbs]
 GO
 
 -- ============================================================
--- SERVER  : SQL Server  (tbs database, LEWISB schema)
--- VIEW    : LEWISB.XTMSDLVY_LINES_TMS
+-- SERVER  : SQL Server  (tbs database, TMSNEW schema)
+-- VIEW    : TMSNEW.XTMSDLVY_LINES_TMS
 -- PURPOSE : Product lines for TMS delivery stops (DROPS)
 --           One row per product line per delivery document.
 --           Join SDELIVERYD (lines) → SDELIVERY (header validity)
 -- USAGE   : WHERE DOCNUM = ?  OR  WHERE DOCNUM IN (?,?,…)
 -- ============================================================
 
-CREATE OR ALTER VIEW [LEWISB].[XTMSDLVY_LINES_TMS]
+CREATE OR ALTER VIEW [TMSNEW].[XTMSDLVY_LINES_TMS]
 AS
 SELECT
     L.SDHNUM_0          AS DOCNUM,
@@ -37,8 +37,8 @@ SELECT
     L.SER_0             AS SERIAL_NO,
     L.DMVSTA_0          AS LINE_STATUS
 
-FROM       tbs.LEWISB.SDELIVERYD    L
-JOIN       tbs.LEWISB.SDELIVERY     S
+FROM       tbs.TMSNEW.SDELIVERYD    L
+JOIN       tbs.TMSNEW.SDELIVERY     S
     ON     S.SDHNUM_0  = L.SDHNUM_0
 
 WHERE

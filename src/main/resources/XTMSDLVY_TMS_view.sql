@@ -3,7 +3,7 @@ GO
 
 -- ============================================================
 -- SERVER    : SQL Server  (tbs database)
--- VIEW      : LEWISB.XTMSDLVY_TMS
+-- VIEW      : TMSNEW.XTMSDLVY_TMS
 -- PURPOSE   : TMS Route Planner — DELIVERY stops (DROPS)
 --             Standalone version. Contains ONLY fields sourced
 --             from X3 (marked x in field classification).
@@ -29,7 +29,7 @@ GO
 --             (X3 must have coords for stop to be valid).
 -- ============================================================
 
-CREATE OR ALTER VIEW [LEWISB].[XTMSDLVY_TMS]
+CREATE OR ALTER VIEW [TMSNEW].[XTMSDLVY_TMS]
 AS
 SELECT
 
@@ -145,27 +145,27 @@ SELECT
     -- ── Instructions ──────────────────────────────────────────
     S.XCOMMENT_0                                    AS DOCINST
 
-FROM       tbs.LEWISB.SDELIVERY     S
-JOIN       tbs.LEWISB.BPARTNER      B
+FROM       tbs.TMSNEW.SDELIVERY     S
+JOIN       tbs.TMSNEW.BPARTNER      B
     ON     B.BPRNUM_0  = S.BPCORD_0
-JOIN       tbs.LEWISB.BPADDRESS     A
+JOIN       tbs.TMSNEW.BPADDRESS     A
     ON     A.BPANUM_0  = S.BPCORD_0
    AND     A.BPAADD_0  = S.BPAADD_0
    AND     A.BPATYP_0  = 1
-LEFT JOIN  tbs.LEWISB.XX10CPLANCHD  D
+LEFT JOIN  tbs.TMSNEW.XX10CPLANCHD  D
     ON     D.SDHNUM_0  = S.SDHNUM_0
-LEFT JOIN  tbs.LEWISB.BPCARRIER     BC
+LEFT JOIN  tbs.TMSNEW.BPCARRIER     BC
     ON     BC.BPTNUM_0 = S.BPTNUM_0
-JOIN       tbs.LEWISB.BPDLVCUST     BS
+JOIN       tbs.TMSNEW.BPDLVCUST     BS
     ON     BS.BPCNUM_0 = S.BPCORD_0
    AND     BS.BPAADD_0 = S.BPAADD_0
-LEFT JOIN  tbs.LEWISB.ASTYLE        SS
+LEFT JOIN  tbs.TMSNEW.ASTYLE        SS
     ON     SS.COD_0    = BC.XSTYLE_0
-LEFT JOIN  tbs.LEWISB.XTMSROUTECODE RC
+LEFT JOIN  tbs.TMSNEW.XTMSROUTECODE RC
     ON     RC.LANNUM_0 = S.DRN_0
-LEFT JOIN  tbs.LEWISB.XX10TRIPS     TP
+LEFT JOIN  tbs.TMSNEW.XX10TRIPS     TP
     ON     TP.TRIPCODE = S.XX10C_NUMPC_0
-LEFT JOIN  tbs.LEWISB.XX10CLODSTOH  L
+LEFT JOIN  tbs.TMSNEW.XX10CLODSTOH  L
     ON     L.XVRSEL_0  = TP.TRIPCODE
 
 WHERE

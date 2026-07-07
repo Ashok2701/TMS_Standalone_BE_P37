@@ -2,11 +2,11 @@ USE [tbs]
 GO
 
 -- ============================================================
--- VIEW: LEWISB.XTMSDLVY_LINES_TMS
+-- VIEW: TMSNEW.XTMSDLVY_LINES_TMS
 -- PURPOSE: Product lines for delivery stops (DROPS)
 -- One row per product line per delivery document
 -- ============================================================
-CREATE OR ALTER VIEW [LEWISB].[XTMSDLVY_LINES_TMS]
+CREATE OR ALTER VIEW [TMSNEW].[XTMSDLVY_LINES_TMS]
 AS
 SELECT
     -- Document identity
@@ -44,15 +44,15 @@ SELECT
     -- Status
     L.DMVSTA_0                  AS LINE_STATUS
 
-FROM tbs.LEWISB.SDELIVERYD L
+FROM tbs.TMSNEW.SDELIVERYD L
 
 GO
 
 -- ============================================================
--- VIEW: LEWISB.XTMSPICK_LINES_TMS
+-- VIEW: TMSNEW.XTMSPICK_LINES_TMS
 -- PURPOSE: Product lines for pickup stops (PICKUPS)
 -- ============================================================
-CREATE OR ALTER VIEW [LEWISB].[XTMSPICK_LINES_TMS]
+CREATE OR ALTER VIEW [TMSNEW].[XTMSPICK_LINES_TMS]
 AS
 SELECT
     -- Document identity
@@ -89,7 +89,7 @@ SELECT
     -- Status
     L.STA_0                     AS LINE_STATUS
 
-FROM tbs.LEWISB.STOJOU L
+FROM tbs.TMSNEW.STOJOU L
 WHERE L.MVTTYP_0 IN (2, 3)  -- picking movements
 
 GO

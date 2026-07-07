@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
  *
  * Defined in application.properties:
  *   db.schema  = tms     → Postgres TMS schema
- *   x3.schema  = LEWISB  → SQL Server X3 schema (tbs database)
+ *   x3.schema  = TMSNEW  → SQL Server X3 schema (tbs database)
  *
  * To change either schema, update application.properties only —
  * no code changes needed.
@@ -22,5 +22,5 @@ public class SchemaConfig {
     private String postgresSchema;   // "tms"
 
     @Value("${x3.schema}")
-    private String x3Schema;         // "LEWISB"
+    private String x3Schema;         // "TMSNEW"
 }

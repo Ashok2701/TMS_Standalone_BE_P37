@@ -14,7 +14,7 @@ import java.util.Map;
 
 /**
  * Most queries here target X3 tables (FACILITY, BPCARRIER, XX10CCLASS, etc.)
- * which live in SQL Server (tbs / LEWISB schema) via sqlServerJdbcTemplate.
+ * which live in SQL Server (tbs / TMSNEW schema) via sqlServerJdbcTemplate.
  *
  * EXCEPTION: driver lists use Postgres tms.xr_driver (TMS master data,
  * synced separately) instead of X3's XX10CDRIVER.

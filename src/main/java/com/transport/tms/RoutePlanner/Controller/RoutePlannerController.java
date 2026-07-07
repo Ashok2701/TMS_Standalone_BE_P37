@@ -33,7 +33,7 @@ public class RoutePlannerController {
     }
 
     // ─────────────────────────────────────────────────────────
-    // GET /api/v1/route-planner/load?siteCode=LEWISB&planDate=2025-06-16
+    // GET /api/v1/route-planner/load?siteCode=TMSNEW&planDate=2025-06-16
     //
     // Returns:
     //   site        — site detail from Postgres (xr_site)

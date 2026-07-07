@@ -3,10 +3,10 @@ GO
 
 -- ============================================================
 -- SERVER    : SQL Server  (tbs database)
--- SCHEMA    : LEWISB
--- VIEW      : LEWISB.XTMSPICK_TMS
+-- SCHEMA    : TMSNEW
+-- VIEW      : TMSNEW.XTMSPICK_TMS
 -- PURPOSE   : TMS Route Planner — PICK TICKET stops
---             Same structure as LEWISB.XTMSDLVY_TMS.
+--             Same structure as TMSNEW.XTMSDLVY_TMS.
 --             Contains ONLY SQL Server (x) fields.
 --
 -- EXCLUDED (p — enriched from Postgres vw_rp_stop_enrich):
@@ -41,7 +41,7 @@ GO
 --                    (delivery uses 'SDN' AND LANNUM_0=5)
 -- ============================================================
 
-CREATE OR ALTER VIEW [LEWISB].[XTMSPICK_TMS]
+CREATE OR ALTER VIEW [TMSNEW].[XTMSPICK_TMS]
 AS
 SELECT
 
@@ -167,27 +167,27 @@ SELECT
     -- ── Instructions ──────────────────────────────────────────
     ''                                              AS DOCINST
 
-FROM       tbs.LEWISB.STOPREH       P
-JOIN       tbs.LEWISB.BPARTNER      B
+FROM       tbs.TMSNEW.STOPREH       P
+JOIN       tbs.TMSNEW.BPARTNER      B
     ON     B.BPRNUM_0  = P.BPCORD_0
-JOIN       tbs.LEWISB.BPADDRESS     A
+JOIN       tbs.TMSNEW.BPADDRESS     A
     ON     A.BPANUM_0  = P.BPCORD_0
    AND     A.BPAADD_0  = P.BPAADD_0
    AND     A.BPATYP_0  = 1
-LEFT JOIN  tbs.LEWISB.BPCARRIER     BC
+LEFT JOIN  tbs.TMSNEW.BPCARRIER     BC
     ON     BC.BPTNUM_0 = P.BPTNUM_0
-JOIN       tbs.LEWISB.BPDLVCUST     BS
+JOIN       tbs.TMSNEW.BPDLVCUST     BS
     ON     BS.BPCNUM_0 = P.BPCORD_0
    AND     BS.BPAADD_0 = P.BPAADD_0
-LEFT JOIN  tbs.LEWISB.XX10CPLANCHD  D
+LEFT JOIN  tbs.TMSNEW.XX10CPLANCHD  D
     ON     D.SDHNUM_0  = P.PRHNUM_0
-LEFT JOIN  tbs.LEWISB.ASTYLE        SS
+LEFT JOIN  tbs.TMSNEW.ASTYLE        SS
     ON     SS.COD_0    = BC.XSTYLE_0
-LEFT JOIN  tbs.LEWISB.XTMSROUTECODE RC
+LEFT JOIN  tbs.TMSNEW.XTMSROUTECODE RC
     ON     RC.LANNUM_0 = P.DRN_0
-LEFT JOIN  tbs.LEWISB.XX10TRIPS     TP
+LEFT JOIN  tbs.TMSNEW.XX10TRIPS     TP
     ON     TP.TRIPCODE = P.XX10C_NUMPC_0
-LEFT JOIN  tbs.LEWISB.XX10CLODSTOH  L
+LEFT JOIN  tbs.TMSNEW.XX10CLODSTOH  L
     ON     L.XVRSEL_0  = TP.TRIPCODE
 
 WHERE
