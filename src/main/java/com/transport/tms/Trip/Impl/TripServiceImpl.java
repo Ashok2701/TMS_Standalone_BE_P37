@@ -53,23 +53,14 @@ public class TripServiceImpl implements TripService {
 
         XrTrip saved = repo.save(trip);
 
-        // ── Update XX10TRIPS optistatus in X3 ────────────────
-        try {
-            String x3 = schemas.getX3Schema();
-            sqlServerJdbc.update(
-                "UPDATE " + x3 + ".XX10TRIPS SET optistatus = ? WHERE TRIPCODE = ?",
-                "Optimized", saved.getTripCode()
-            );
-        } catch (Exception e) {
-            System.err.println("Warning: XX10TRIPS update failed for " + saved.getTripCode() + ": " + e.getMessage());
-        }
+        // ── X3 writes on CONFIRM ──────────────────────────────
+        // 1. Insert XX10TRIPS
+        try { writeX3Trip(saved); }
+        catch (Exception e) { System.err.println("X3 XX10TRIPS insert failed: " + e.getMessage()); }
 
-        // Update departure/arrival times per stop in SDELIVERY + STOPREH
-        try {
-            updateStopTimes(saved);
-        } catch (Exception e) {
-            System.err.println("Warning: stop times update failed for " + saved.getTripCode() + ": " + e.getMessage());
-        }
+        // 2. Update SDELIVERY/STOPREH: trip code + driver + vehicle + status=1
+        try { updateStopDocuments(saved); }
+        catch (Exception e) { System.err.println("X3 stop documents failed: " + e.getMessage()); }
 
         return toDTO(saved);
     }
@@ -201,12 +192,27 @@ public class TripServiceImpl implements TripService {
                 trip.setStopObjectsJson(objectMapper.writeValueAsString(stopList));
 
             } catch (Exception e) {
-                // Log but don't fail the whole request
                 System.err.println("Warning: could not merge stop optimisation results: " + e.getMessage());
             }
         }
 
-        return toDTO(repo.save(trip));
+        XrTrip saved = repo.save(trip);
+
+        // ── X3 writes on OPTIMISE ─────────────────────────────
+        // 3. Update XX10TRIPS.optistatus = Optimized
+        try {
+            String x3 = schemas.getX3Schema();
+            sqlServerJdbc.update(
+                "UPDATE " + x3 + ".XX10TRIPS SET optistatus = ? WHERE TRIPCODE = ?",
+                "Optimized", saved.getTripCode()
+            );
+        } catch (Exception e) { System.err.println("X3 XX10TRIPS optimise failed: " + e.getMessage()); }
+
+        // 4. Update SDELIVERY/STOPREH: arrival + departure time per stop
+        try { updateStopTimes(saved); }
+        catch (Exception e) { System.err.println("X3 stop times failed: " + e.getMessage()); }
+
+        return toDTO(saved);
     }
 
     // ── DELETE ────────────────────────────────────────────────
