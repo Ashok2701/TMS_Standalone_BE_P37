@@ -54,6 +54,16 @@ public class VehicleServiceImpl implements VehicleService {
                 .orElseThrow(() -> new RuntimeException("Vehicle not found: " + vehicleCode));
     }
 
+    // ── DELETE ───────────────────────────────────────────────
+    @Override
+    public void delete(String vehicleCode) {
+        Vehicle entity = vehicleRepository.findById(vehicleCode)
+                .orElseThrow(() -> new RuntimeException("Vehicle not found: " + vehicleCode));
+        entity.setActive(false);
+        entity.setUpdatedAt(java.time.LocalDateTime.now());
+        vehicleRepository.save(entity);   // soft delete — set active=false
+    }
+
     // ── GET ALL ───────────────────────────────────────────────
     @Override
     public List<VehicleDTO> getAll() {
