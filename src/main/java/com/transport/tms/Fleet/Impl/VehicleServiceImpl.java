@@ -6,7 +6,6 @@ import com.transport.tms.Fleet.Entity.VehicleCategory;
 import com.transport.tms.Fleet.Repository.VehicleCategoryRepository;
 import com.transport.tms.Fleet.Repository.VehicleRepository;
 import com.transport.tms.Fleet.Service.VehicleService;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -17,224 +16,228 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-@Transactional
-public class VehicleServiceImpl
-        implements VehicleService {
+public class VehicleServiceImpl implements VehicleService {
 
-    private final VehicleRepository repository;
-
+    private final VehicleRepository         vehicleRepository;
     private final VehicleCategoryRepository categoryRepository;
 
+    // ── CREATE ────────────────────────────────────────────────
     @Override
-    public VehicleDTO create(
-            VehicleDTO dto) {
-
-        if(repository.existsByVehicleCode(
-                dto.getVehicleCode())) {
-
-            throw new RuntimeException(
-                    "Vehicle Code already exists");
+    public VehicleDTO create(VehicleDTO dto) {
+        if (vehicleRepository.existsByVehicleCode(dto.getVehicleCode())) {
+            throw new RuntimeException("Vehicle code already exists: " + dto.getVehicleCode());
         }
-
-        VehicleCategory category =
-                categoryRepository.findById(
-                                dto.getCategoryCode())
-                        .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Vehicle Category not found"));
-
-        Vehicle entity =
-                new Vehicle();
-
-        entity.setVehicleCode(
-                dto.getVehicleCode());
-
-        entity.setVehicleName(
-                dto.getVehicleName());
-
-        entity.setVehicleNumber(
-                dto.getVehicleNumber());
-
-        entity.setCategory(
-                category);
-
-        entity.setBrand(
-                dto.getBrand());
-
-        entity.setModel(
-                dto.getModel());
-
-        entity.setVehicleYear(
-                dto.getVehicleYear());
-
-        entity.setColor(
-                dto.getColor());
-
-        entity.setCapacityWeight(
-                dto.getCapacityWeight());
-
-        entity.setCapacityVolume(
-                dto.getCapacityVolume());
-
-        entity.setVolumeUnit(
-                dto.getVolumeUnit());
-
-        entity.setWeightUnit(
-                dto.getWeightUnit());
-
-        entity.setDriverId(
-                dto.getDriverId());
-
-        entity.setSite(dto.getSite());
-        entity.setDepartureSite(dto.getDepartureSite());
-        entity.setArrivalSite(dto.getArrivalSite());
-        entity.setStartTime(dto.getStartTime());
-        entity.setMaxPallets(dto.getMaxPallets());
-        entity.setMaxCases(dto.getMaxCases());
-
-        entity.setVehicleStatus(
-                dto.getVehicleStatus());
-
-        entity.setActive(
-                dto.getActive());
-
-        entity.setCreatedAt(
-                LocalDateTime.now());
-
-        entity.setUpdatedAt(
-                LocalDateTime.now());
-
-        entity.setUuid(
-                UUID.randomUUID());
-
-        return mapToDTO(
-                repository.save(entity));
+        Vehicle entity = new Vehicle();
+        entity.setUuid(UUID.randomUUID());
+        entity.setCreatedAt(LocalDateTime.now());
+        entity.setCreatedBy(dto.getCreatedBy() != null ? dto.getCreatedBy() : "SYSTEM");
+        fromDTO(dto, entity);
+        return mapToDTO(vehicleRepository.save(entity));
     }
 
+    // ── UPDATE ────────────────────────────────────────────────
     @Override
-    public VehicleDTO update(
-            String vehicleCode,
-            VehicleDTO dto) {
+    public VehicleDTO update(String vehicleCode, VehicleDTO dto) {
+        Vehicle entity = vehicleRepository.findById(vehicleCode)
+                .orElseThrow(() -> new RuntimeException("Vehicle not found: " + vehicleCode));
+        entity.setUpdatedAt(LocalDateTime.now());
+        entity.setUpdatedBy(dto.getUpdatedBy() != null ? dto.getUpdatedBy() : "SYSTEM");
+        fromDTO(dto, entity);
+        return mapToDTO(vehicleRepository.save(entity));
+    }
 
-        Vehicle entity =
-                repository.findById(vehicleCode)
-                        .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Vehicle not found"));
+    // ── GET BY ID ─────────────────────────────────────────────
+    @Override
+    public VehicleDTO getById(String vehicleCode) {
+        return vehicleRepository.findById(vehicleCode)
+                .map(this::mapToDTO)
+                .orElseThrow(() -> new RuntimeException("Vehicle not found: " + vehicleCode));
+    }
 
-        VehicleCategory category =
-                categoryRepository.findById(
-                                dto.getCategoryCode())
-                        .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Vehicle Category not found"));
+    // ── GET ALL ───────────────────────────────────────────────
+    @Override
+    public List<VehicleDTO> getAll() {
+        return vehicleRepository.findAll().stream()
+                .map(this::mapToDTO)
+                .toList();
+    }
 
-        entity.setVehicleName(dto.getVehicleName());
-        entity.setVehicleNumber(dto.getVehicleNumber());
-        entity.setCategory(category);
-        entity.setBrand(dto.getBrand());
-        entity.setModel(dto.getModel());
-        entity.setVehicleYear(dto.getVehicleYear());
-        entity.setColor(dto.getColor());
-        entity.setCapacityWeight(dto.getCapacityWeight());
-        entity.setCapacityVolume(dto.getCapacityVolume());
-        entity.setVolumeUnit(dto.getVolumeUnit());
-        entity.setWeightUnit(dto.getWeightUnit());
-        entity.setDriverId(dto.getDriverId());
-        entity.setSite(dto.getSite());
+    // ── DTO → Entity ──────────────────────────────────────────
+    private void fromDTO(VehicleDTO dto, Vehicle e) {
+        e.setVehicleCode(dto.getVehicleCode());
+        e.setVehicleName(dto.getVehicleName());
+        e.setVehicleNumber(dto.getVehicleNumber());
+
+        // Category
+        if (dto.getCategoryCode() != null) {
+            categoryRepository.findById(dto.getCategoryCode())
+                    .ifPresent(e::setCategory);
+        }
+
+        e.setBrand(dto.getBrand());
+        e.setModel(dto.getModel());
+        e.setVehicleYear(dto.getVehicleYear());
+        e.setColor(dto.getColor());
+        e.setFuelType(dto.getFuelType());
+        e.setEngineCc(dto.getEngineCc());
+        e.setChassisNumber(dto.getChassisNumber());
+
+        // Capacity
+        e.setCapacityWeight(dto.getCapacityWeight());
+        e.setCapacityVolume(dto.getCapacityVolume());
+        e.setVolumeUnit(dto.getVolumeUnit());
+        e.setWeightUnit(dto.getWeightUnit());
+
+        // Site / Depot
+        e.setSiteCode(dto.getSiteCode());
+        e.setStartDepot(dto.getStartDepot());
+        e.setEndDepot(dto.getEndDepot());
+        e.setArrivalDeparture(dto.getArrivalDeparture());
+
+        // Timing
+        e.setEarliestStartTime(dto.getEarliestStartTime());
+        e.setMaxTotalTime(dto.getMaxTotalTime());
+        e.setMaxTotalTravel(dto.getMaxTotalTravel());
+        e.setMaxTotalDistance(dto.getMaxTotalDistance());
+        e.setMaxOrderCount(dto.getMaxOrderCount());
+
+        // Cost
+        e.setFixedCost(dto.getFixedCost());
+        e.setCostPerTime(dto.getCostPerTime());
+        e.setCostPerDistance(dto.getCostPerDistance());
+        e.setOvertimeStart(dto.getOvertimeStart());
+        e.setOvertimeCost(dto.getOvertimeCost());
+
+        // Dimensions
+        e.setVehicleLength(dto.getVehicleLength());
+        e.setVehicleWidth(dto.getVehicleWidth());
+        e.setVehicleHeight(dto.getVehicleHeight());
+        e.setEmptyMass(dto.getEmptyMass());
+        e.setGrossMass(dto.getGrossMass());
+        e.setTolerance(dto.getTolerance());
+
+        // Driver / Trailer
+        e.setDriverId(dto.getDriverId());
+        e.setTrailerNumber(dto.getTrailerNumber());
+        e.setAllowAllDrivers(dto.getAllowAllDrivers());
+
+        // Tracking
+        e.setGpsId(dto.getGpsId());
+        e.setMobileTracker(dto.getMobileTracker());
+        e.setOdometer(dto.getOdometer());
+        e.setCurrentMeter(dto.getCurrentMeter());
+
+        // Licensing
+        e.setLicenseReference(dto.getLicenseReference());
+        e.setLicenseExpiry(dto.getLicenseExpiry());
+        e.setInsuranceReference(dto.getInsuranceReference());
+        e.setInsuranceExpiry(dto.getInsuranceExpiry());
+        e.setLastInspectionDate(dto.getLastInspectionDate());
+        e.setInspectionExpiry(dto.getInspectionExpiry());
+
+        // Other
+        e.setSpecialtyName(dto.getSpecialtyName());
+        e.setAssignmentRule(dto.getAssignmentRule());
+        e.setEquipmentNotes(dto.getEquipmentNotes());
+        e.setExternalVehicle(dto.getExternalVehicle());
+
+        // Image — decode Base64 → binary
         if (dto.getImage() != null && !dto.getImage().isBlank()) {
             try {
                 String b64 = dto.getImage().contains(",")
                         ? dto.getImage().split(",")[1]
                         : dto.getImage();
-                entity.setImage(Base64.getDecoder().decode(b64));
+                e.setVehicleImage(Base64.getDecoder().decode(b64));
             } catch (Exception ignored) {}
         }
-        entity.setDepartureSite(dto.getDepartureSite());
-        entity.setArrivalSite(dto.getArrivalSite());
-        entity.setStartTime(dto.getStartTime());
-        entity.setMaxPallets(dto.getMaxPallets());
-        entity.setMaxCases(dto.getMaxCases());
-        entity.setVehicleStatus(dto.getVehicleStatus());
-        entity.setActive(dto.getActive());
 
-        entity.setUpdatedAt(
-                LocalDateTime.now());
-
-        return mapToDTO(
-                repository.save(entity));
+        // Status
+        e.setActive(dto.getActive() != null ? dto.getActive() : true);
+        e.setVehicleStatus(dto.getVehicleStatus());
     }
 
-    @Override
-    public VehicleDTO getById(
-            String vehicleCode) {
+    // ── Entity → DTO ──────────────────────────────────────────
+    private VehicleDTO mapToDTO(Vehicle e) {
+        VehicleDTO dto = new VehicleDTO();
+        dto.setVehicleCode(e.getVehicleCode());
+        dto.setVehicleName(e.getVehicleName());
+        dto.setVehicleNumber(e.getVehicleNumber());
 
-        return mapToDTO(
-                repository.findById(vehicleCode)
-                        .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Vehicle not found")));
-    }
-
-    @Override
-    public List<VehicleDTO> getAll() {
-
-        return repository.findAll()
-                .stream()
-                .map(this::mapToDTO)
-                .toList();
-    }
-
-    @Override
-    public void delete(
-            String vehicleCode) {
-
-        repository.deleteById(vehicleCode);
-    }
-
-    private VehicleDTO mapToDTO(
-            Vehicle entity) {
-
-        VehicleDTO dto =
-                new VehicleDTO();
-
-        dto.setVehicleCode(entity.getVehicleCode());
-        dto.setVehicleName(entity.getVehicleName());
-        dto.setVehicleNumber(entity.getVehicleNumber());
-
-        dto.setCategoryCode(
-                entity.getCategory().getCategoryCode());
-
-        dto.setCategoryDescription(
-                entity.getCategory().getDescription());
-
-        dto.setBrand(entity.getBrand());
-        dto.setModel(entity.getModel());
-        dto.setVehicleYear(entity.getVehicleYear());
-        dto.setColor(entity.getColor());
-
-        dto.setCapacityWeight(entity.getCapacityWeight());
-        dto.setCapacityVolume(entity.getCapacityVolume());
-
-        dto.setVolumeUnit(entity.getVolumeUnit());
-        dto.setWeightUnit(entity.getWeightUnit());
-
-        dto.setDriverId(entity.getDriverId());
-        dto.setSite(entity.getSite());
-        // Image: encode binary → Base64 string for JSON
-        if (entity.getImage() != null && entity.getImage().length > 0) {
-            dto.setImage("data:image/jpeg;base64,"
-                    + Base64.getEncoder().encodeToString(entity.getImage()));
+        if (e.getCategory() != null) {
+            dto.setCategoryCode(e.getCategory().getCategoryCode());
+            dto.setCategoryDescription(e.getCategory().getDescription());
         }
-        dto.setDepartureSite(entity.getDepartureSite());
-        dto.setArrivalSite(entity.getArrivalSite());
-        dto.setStartTime(entity.getStartTime());
-        dto.setMaxPallets(entity.getMaxPallets());
-        dto.setMaxCases(entity.getMaxCases());
 
-        dto.setVehicleStatus(entity.getVehicleStatus());
+        dto.setBrand(e.getBrand());
+        dto.setModel(e.getModel());
+        dto.setVehicleYear(e.getVehicleYear());
+        dto.setColor(e.getColor());
+        dto.setFuelType(e.getFuelType());
+        dto.setEngineCc(e.getEngineCc());
+        dto.setChassisNumber(e.getChassisNumber());
 
-        dto.setActive(entity.getActive());
+        dto.setCapacityWeight(e.getCapacityWeight());
+        dto.setCapacityVolume(e.getCapacityVolume());
+        dto.setVolumeUnit(e.getVolumeUnit());
+        dto.setWeightUnit(e.getWeightUnit());
+
+        dto.setSiteCode(e.getSiteCode());
+        dto.setStartDepot(e.getStartDepot());
+        dto.setEndDepot(e.getEndDepot());
+        dto.setArrivalDeparture(e.getArrivalDeparture());
+
+        dto.setEarliestStartTime(e.getEarliestStartTime());
+        dto.setMaxTotalTime(e.getMaxTotalTime());
+        dto.setMaxTotalTravel(e.getMaxTotalTravel());
+        dto.setMaxTotalDistance(e.getMaxTotalDistance());
+        dto.setMaxOrderCount(e.getMaxOrderCount());
+
+        dto.setFixedCost(e.getFixedCost());
+        dto.setCostPerTime(e.getCostPerTime());
+        dto.setCostPerDistance(e.getCostPerDistance());
+        dto.setOvertimeStart(e.getOvertimeStart());
+        dto.setOvertimeCost(e.getOvertimeCost());
+
+        dto.setVehicleLength(e.getVehicleLength());
+        dto.setVehicleWidth(e.getVehicleWidth());
+        dto.setVehicleHeight(e.getVehicleHeight());
+        dto.setEmptyMass(e.getEmptyMass());
+        dto.setGrossMass(e.getGrossMass());
+        dto.setTolerance(e.getTolerance());
+
+        dto.setDriverId(e.getDriverId());
+        dto.setTrailerNumber(e.getTrailerNumber());
+        dto.setAllowAllDrivers(e.getAllowAllDrivers());
+
+        dto.setGpsId(e.getGpsId());
+        dto.setMobileTracker(e.getMobileTracker());
+        dto.setOdometer(e.getOdometer());
+        dto.setCurrentMeter(e.getCurrentMeter());
+
+        dto.setLicenseReference(e.getLicenseReference());
+        dto.setLicenseExpiry(e.getLicenseExpiry());
+        dto.setInsuranceReference(e.getInsuranceReference());
+        dto.setInsuranceExpiry(e.getInsuranceExpiry());
+        dto.setLastInspectionDate(e.getLastInspectionDate());
+        dto.setInspectionExpiry(e.getInspectionExpiry());
+
+        dto.setSpecialtyName(e.getSpecialtyName());
+        dto.setAssignmentRule(e.getAssignmentRule());
+        dto.setEquipmentNotes(e.getEquipmentNotes());
+        dto.setExternalVehicle(e.getExternalVehicle());
+
+        // Image — encode binary → Base64
+        if (e.getVehicleImage() != null && e.getVehicleImage().length > 0) {
+            dto.setImage("data:image/jpeg;base64,"
+                    + Base64.getEncoder().encodeToString(e.getVehicleImage()));
+        }
+
+        dto.setActive(e.getActive());
+        dto.setVehicleStatus(e.getVehicleStatus());
+        dto.setCreatedBy(e.getCreatedBy());
+        dto.setCreatedAt(e.getCreatedAt());
+        dto.setUpdatedBy(e.getUpdatedBy());
+        dto.setUpdatedAt(e.getUpdatedAt());
 
         return dto;
     }

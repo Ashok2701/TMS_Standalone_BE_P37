@@ -235,30 +235,41 @@ public class RoutePlannerServiceImpl implements RoutePlannerService {
         dto.setVehicleCode(v.getVehicleCode());
         dto.setVehicleName(v.getVehicleName());
         dto.setVehicleNumber(v.getVehicleNumber());
-        dto.setDriverId(v.getDriverId());
-        dto.setSite(v.getSite());
-        if (v.getImage() != null && v.getImage().length > 0) {
-            dto.setImage("data:image/jpeg;base64,"
-                    + Base64.getEncoder().encodeToString(v.getImage()));
-        }
-        dto.setDepartureSite(v.getDepartureSite());
-        dto.setArrivalSite(v.getArrivalSite());
-        dto.setStartTime(v.getStartTime());
-        dto.setMaxPallets(v.getMaxPallets());
-        dto.setMaxCases(v.getMaxCases());
-        dto.setVehicleStatus(v.getVehicleStatus());
-        dto.setCapacityWeight(v.getCapacityWeight());
-        dto.setCapacityVolume(v.getCapacityVolume());
-        dto.setVolumeUnit(v.getVolumeUnit());
-        dto.setWeightUnit(v.getWeightUnit());
         dto.setBrand(v.getBrand());
         dto.setModel(v.getModel());
         dto.setVehicleYear(v.getVehicleYear());
         dto.setColor(v.getColor());
+        dto.setCapacityWeight(v.getCapacityWeight());
+        dto.setCapacityVolume(v.getCapacityVolume());
+        dto.setVolumeUnit(v.getVolumeUnit());
+        dto.setWeightUnit(v.getWeightUnit());
+        // Site / Depot
+        dto.setSiteCode(v.getSiteCode());
+        dto.setStartDepot(v.getStartDepot());
+        dto.setEndDepot(v.getEndDepot());
+        dto.setEarliestStartTime(v.getEarliestStartTime());
+        // Cost
+        dto.setFixedCost(v.getFixedCost());
+        dto.setCostPerTime(v.getCostPerTime());
+        dto.setCostPerDistance(v.getCostPerDistance());
+        // Constraints
+        dto.setMaxOrderCount(v.getMaxOrderCount());
+        dto.setMaxTotalTime(v.getMaxTotalTime());
+        dto.setMaxTotalDistance(v.getMaxTotalDistance());
+        // Driver
+        dto.setDriverId(v.getDriverId());
+        // Image
+        if (v.getVehicleImage() != null && v.getVehicleImage().length > 0) {
+            dto.setImage("data:image/jpeg;base64,"
+                    + java.util.Base64.getEncoder().encodeToString(v.getVehicleImage()));
+        }
+        // Category
         if (v.getCategory() != null) {
             dto.setCategoryCode(v.getCategory().getCategoryCode());
             dto.setCategoryDescription(v.getCategory().getDescription());
         }
+        dto.setVehicleStatus(v.getVehicleStatus());
+        dto.setActive(v.getActive());
         return dto;
     }
 

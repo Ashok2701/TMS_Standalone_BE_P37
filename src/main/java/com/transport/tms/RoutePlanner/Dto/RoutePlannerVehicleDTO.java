@@ -9,42 +9,45 @@ import java.math.BigDecimal;
 @Setter
 public class RoutePlannerVehicleDTO {
 
-    private String vehicleCode;
+    private String     vehicleCode;
+    private String     vehicleName;
+    private String     vehicleNumber;
+    private String     categoryCode;
+    private String     categoryDescription;
+    private String     brand;
+    private String     model;
+    private Short      vehicleYear;
+    private String     color;
 
-    private String vehicleName;
-
-    private String vehicleNumber;
-
-    private String categoryCode;
-
-    private String categoryDescription;
-
-    private String brand;
-
-    private String model;
-
-    private Short vehicleYear;
-
-    private String color;
-
+    // Capacity
     private BigDecimal capacityWeight;
-
     private BigDecimal capacityVolume;
+    private String     volumeUnit;
+    private String     weightUnit;
 
-    private String volumeUnit;
+    // Site / Depot
+    private String     siteCode;           // site this vehicle belongs to
+    private String     startDepot;         // departure depot
+    private String     endDepot;           // arrival depot
+    private String     earliestStartTime;  // HH:MM
 
-    private String weightUnit;
+    // Cost (used by VROOM)
+    private BigDecimal fixedCost;
+    private BigDecimal costPerTime;
+    private BigDecimal costPerDistance;
 
-    private Short vehicleStatus;
+    // Constraints
+    private Short      maxOrderCount;
+    private BigDecimal maxTotalTime;
+    private BigDecimal maxTotalDistance;
 
-    // Assigned driver (from xr_vehicle.driver_id)
-    private String driverId;
+    // Driver
+    private String     driverId;
 
-    // Site/facility this vehicle belongs to
-    private String site;
-    private String image;   // Base64 encoded
-    private String departureSite;
-    private String arrivalSite;    private String startTime;
-    private Integer maxPallets;
-    private Integer maxCases;
+    // Image — Base64 encoded
+    private String     image;
+
+    // Status
+    private Short      vehicleStatus;
+    private Boolean    active;
 }

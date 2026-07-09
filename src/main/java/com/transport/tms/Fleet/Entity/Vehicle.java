@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "xr_vehicle")
+@Table(name = "xr_vehicle", schema = "tms")
 @Getter
 @Setter
 public class Vehicle {
@@ -25,9 +25,7 @@ public class Vehicle {
     private String vehicleNumber;
 
     @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(
-            name = "category_code",
-            referencedColumnName = "category_code")
+    @JoinColumn(name = "category_code", referencedColumnName = "category_code")
     private VehicleCategory category;
 
     @Column(name = "brand")
@@ -42,6 +40,15 @@ public class Vehicle {
     @Column(name = "color")
     private String color;
 
+    @Column(name = "fuel_type")
+    private Short fuelType;
+
+    @Column(name = "engine_cc")
+    private Short engineCc;
+
+    @Column(name = "chassis_number")
+    private String chassisNumber;
+
     @Column(name = "capacity_weight")
     private BigDecimal capacityWeight;
 
@@ -54,36 +61,136 @@ public class Vehicle {
     @Column(name = "weight_unit")
     private String weightUnit;
 
+    // ── Site / depot ──────────────────────────────────────────
+    @Column(name = "site_code")
+    private String siteCode;          // site this vehicle belongs to
+
+    @Column(name = "start_depot")
+    private String startDepot;        // departure depot/site
+
+    @Column(name = "end_depot")
+    private String endDepot;          // arrival depot/site
+
+    @Column(name = "arrival_departure")
+    private String arrivalDeparture;  // arrival/departure config
+
+    // ── Timing ───────────────────────────────────────────────
+    @Column(name = "earliest_start_time")
+    private String earliestStartTime; // HH:MM e.g. "07:00"
+
+    @Column(name = "max_total_time")
+    private BigDecimal maxTotalTime;
+
+    @Column(name = "max_total_travel")
+    private BigDecimal maxTotalTravel;
+
+    @Column(name = "max_total_distance")
+    private BigDecimal maxTotalDistance;
+
+    @Column(name = "max_order_count")
+    private Short maxOrderCount;
+
+    // ── Cost ─────────────────────────────────────────────────
+    @Column(name = "fixed_cost")
+    private BigDecimal fixedCost;
+
+    @Column(name = "cost_per_time")
+    private BigDecimal costPerTime;
+
+    @Column(name = "cost_per_distance")
+    private BigDecimal costPerDistance;
+
+    @Column(name = "overtime_start")
+    private BigDecimal overtimeStart;
+
+    @Column(name = "overtime_cost")
+    private BigDecimal overtimeCost;
+
+    // ── Dimensions ───────────────────────────────────────────
+    @Column(name = "vehicle_length")
+    private BigDecimal vehicleLength;
+
+    @Column(name = "vehicle_width")
+    private BigDecimal vehicleWidth;
+
+    @Column(name = "vehicle_height")
+    private BigDecimal vehicleHeight;
+
+    @Column(name = "empty_mass")
+    private BigDecimal emptyMass;
+
+    @Column(name = "gross_mass")
+    private BigDecimal grossMass;
+
+    @Column(name = "tolerance")
+    private BigDecimal tolerance;
+
+    // ── Driver / Trailer ─────────────────────────────────────
     @Column(name = "driver_id")
     private String driverId;
 
-    @Column(name = "site")
-    private String site;
+    @Column(name = "trailer_number")
+    private String trailerNumber;
 
-    @Column(name = "image")
-    private byte[] image;   // vehicle photo as binary (BYTEA)           // site/facility code — xr_site.site_code
+    @Column(name = "allow_all_drivers")
+    private Boolean allowAllDrivers;
 
-    @Column(name = "departure_site")
-    private String departureSite;  // departure site code
+    // ── Tracking ─────────────────────────────────────────────
+    @Column(name = "gps_id")
+    private String gpsId;
 
-    @Column(name = "arrival_site")
-    private String arrivalSite;    // arrival site code
+    @Column(name = "mobile_tracker")
+    private String mobileTracker;
 
-    @Column(name = "start_time")
-    private String startTime;      // default start time HH:MM e.g. "07:00"
+    @Column(name = "odometer")
+    private Integer odometer;
 
-    @Column(name = "max_pallets")
-    private Integer maxPallets;    // max pallet count
+    @Column(name = "current_meter")
+    private BigDecimal currentMeter;
 
-    @Column(name = "max_cases")
-    private Integer maxCases;      // max cases count
+    // ── Licensing / Inspection ───────────────────────────────
+    @Column(name = "license_reference")
+    private String licenseReference;
 
+    @Column(name = "license_expiry")
+    private LocalDateTime licenseExpiry;
+
+    @Column(name = "insurance_reference")
+    private String insuranceReference;
+
+    @Column(name = "insurance_expiry")
+    private LocalDateTime insuranceExpiry;
+
+    @Column(name = "last_inspection_date")
+    private LocalDateTime lastInspectionDate;
+
+    @Column(name = "inspection_expiry")
+    private LocalDateTime inspectionExpiry;
+
+    // ── Other ────────────────────────────────────────────────
+    @Column(name = "specialty_name")
+    private String specialtyName;
+
+    @Column(name = "assignment_rule")
+    private String assignmentRule;
+
+    @Column(name = "equipment_notes", columnDefinition = "TEXT")
+    private String equipmentNotes;
+
+    @Column(name = "external_vehicle")
+    private Boolean externalVehicle;
+
+    @Column(name = "vehicle_image")
+    private byte[] vehicleImage;      // binary photo — BYTEA
+
+    // ── Status / Flags ───────────────────────────────────────
     @Column(name = "active")
     private Boolean active = true;
 
     @Column(name = "vehicle_status")
     private Short vehicleStatus;
 
+    // ── Audit ─────────────────────────────────────────────────
     @Column(name = "created_by")
     private String createdBy;
 
