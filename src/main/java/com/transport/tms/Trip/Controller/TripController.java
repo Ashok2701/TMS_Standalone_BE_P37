@@ -39,30 +39,30 @@ public class TripController {
         return ResponseEntity.ok(service.getTripsBySite(site));
     }
 
-    /** GET /api/v1/trips/{id} */
+    /** GET /api/v1/trips/{tripCode} */
     @GetMapping("/{tripCode}")
     public ResponseEntity<TripResponseDTO> getTripById(@PathVariable String tripCode) {
         return ResponseEntity.ok(service.getTripById(tripCode));
     }
 
-    /** PUT /api/v1/trips/{id} — full update */
+    /** PUT /api/v1/trips/{tripCode} — full update */
     @PutMapping("/{tripCode}")
     public ResponseEntity<TripResponseDTO> updateTrip(
             @PathVariable String tripCode,
             @RequestBody TripRequestDTO request) {
-        return ResponseEntity.ok(service.updateTrip(id, request));
+        return ResponseEntity.ok(service.updateTrip(tripCode, request));
     }
 
-    /** PATCH /api/v1/trips/{id}/status — lock / validate / open */
+    /** PATCH /api/v1/trips/{tripCode}/status — lock / validate / open */
     @PatchMapping("/{tripCode}/status")
     public ResponseEntity<TripResponseDTO> updateStatus(
             @PathVariable String tripCode,
             @RequestBody TripStatusDTO statusDTO) {
-        return ResponseEntity.ok(service.updateStatus(id, statusDTO));
+        return ResponseEntity.ok(service.updateStatus(tripCode, statusDTO));
     }
 
     /**
-     * PATCH /api/v1/trips/{id}/optimise — run optimisation and persist results
+     * PATCH /api/v1/trips/{tripCode}/optimise — run optimisation and persist results
      *
      * Body includes:
      *   - orderMode, startTime, endTime, travelTime, totalDistance, costs…
@@ -77,7 +77,7 @@ public class TripController {
         return ResponseEntity.ok(service.optimiseTrip(tripCode, request));
     }
 
-    /** DELETE /api/v1/trips/{id} */
+    /** DELETE /api/v1/trips/{tripCode} */
     @DeleteMapping("/{tripCode}")
     public ResponseEntity<Void> deleteTrip(@PathVariable String tripCode) {
         service.deleteTrip(tripCode);
