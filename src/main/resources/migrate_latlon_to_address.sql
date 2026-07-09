@@ -62,3 +62,9 @@ ALTER TABLE tms.xr_vehicle
     ADD COLUMN IF NOT EXISTS start_time      VARCHAR(10)  NULL,
     ADD COLUMN IF NOT EXISTS max_pallets     INTEGER      NULL,
     ADD COLUMN IF NOT EXISTS max_cases       INTEGER      NULL;
+
+-- ============================================================
+-- Add image column to xr_vehicle (binary photo storage)
+-- ============================================================
+ALTER TABLE tms.xr_vehicle
+    ADD COLUMN IF NOT EXISTS image BYTEA NULL;

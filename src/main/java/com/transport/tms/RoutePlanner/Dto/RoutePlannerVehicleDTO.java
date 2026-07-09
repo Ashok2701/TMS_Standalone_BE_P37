@@ -42,6 +42,7 @@ public class RoutePlannerVehicleDTO {
 
     // Site/facility this vehicle belongs to
     private String site;
+    private String image;   // Base64 encoded
     private String departureSite;
     private String arrivalSite;    private String startTime;
     private Integer maxPallets;

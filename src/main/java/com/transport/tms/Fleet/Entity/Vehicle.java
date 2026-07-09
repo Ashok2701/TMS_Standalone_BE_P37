@@ -58,7 +58,10 @@ public class Vehicle {
     private String driverId;
 
     @Column(name = "site")
-    private String site;           // site/facility code — xr_site.site_code
+    private String site;
+
+    @Column(name = "image")
+    private byte[] image;   // vehicle photo as binary (BYTEA)           // site/facility code — xr_site.site_code
 
     @Column(name = "departure_site")
     private String departureSite;  // departure site code

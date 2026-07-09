@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 
@@ -141,6 +142,14 @@ public class VehicleServiceImpl
         entity.setWeightUnit(dto.getWeightUnit());
         entity.setDriverId(dto.getDriverId());
         entity.setSite(dto.getSite());
+        if (dto.getImage() != null && !dto.getImage().isBlank()) {
+            try {
+                String b64 = dto.getImage().contains(",")
+                        ? dto.getImage().split(",")[1]
+                        : dto.getImage();
+                entity.setImage(Base64.getDecoder().decode(b64));
+            } catch (Exception ignored) {}
+        }
         entity.setDepartureSite(dto.getDepartureSite());
         entity.setArrivalSite(dto.getArrivalSite());
         entity.setStartTime(dto.getStartTime());
@@ -212,6 +221,11 @@ public class VehicleServiceImpl
 
         dto.setDriverId(entity.getDriverId());
         dto.setSite(entity.getSite());
+        // Image: encode binary → Base64 string for JSON
+        if (entity.getImage() != null && entity.getImage().length > 0) {
+            dto.setImage("data:image/jpeg;base64,"
+                    + Base64.getEncoder().encodeToString(entity.getImage()));
+        }
         dto.setDepartureSite(entity.getDepartureSite());
         dto.setArrivalSite(entity.getArrivalSite());
         dto.setStartTime(entity.getStartTime());

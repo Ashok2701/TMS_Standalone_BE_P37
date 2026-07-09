@@ -20,6 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -236,6 +237,10 @@ public class RoutePlannerServiceImpl implements RoutePlannerService {
         dto.setVehicleNumber(v.getVehicleNumber());
         dto.setDriverId(v.getDriverId());
         dto.setSite(v.getSite());
+        if (v.getImage() != null && v.getImage().length > 0) {
+            dto.setImage("data:image/jpeg;base64,"
+                    + Base64.getEncoder().encodeToString(v.getImage()));
+        }
         dto.setDepartureSite(v.getDepartureSite());
         dto.setArrivalSite(v.getArrivalSite());
         dto.setStartTime(v.getStartTime());

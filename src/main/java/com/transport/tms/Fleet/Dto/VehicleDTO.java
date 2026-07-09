@@ -39,6 +39,7 @@ public class VehicleDTO {
 
     private String site;
     private String departureSite;
+    private String image;   // Base64 encoded image for JSON transport
     private String arrivalSite;    private String startTime;
     private Integer maxPallets;
     private Integer maxCases;
