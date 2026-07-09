@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
@@ -56,7 +57,7 @@ public class TripLockService {
 
         trip.setOptiStatus("Locked");
         trip.setLockFlag(1);
-        trip.setDatExec(LocalDateTime.now());
+        trip.setDatExec(OffsetDateTime.now());
         tripRepository.save(trip);
         log.info("LOCKED {} → {}.XX10CPLANCHA + XX10CPLANCHD", trip.getTripCode(), x3);
     }
@@ -306,6 +307,14 @@ public class TripLockService {
     }
 
     // ── Helpers ───────────────────────────────────────────────
+    private String getString(Map<String, Object> m, String... keys) {
+        for (String k : keys) {
+            Object v = m.get(k);
+            if (v != null) return v.toString();
+        }
+        return null;
+    }
+
     private XrTrip findTrip(Long id) {
         return tripRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Trip not found: " + id));
