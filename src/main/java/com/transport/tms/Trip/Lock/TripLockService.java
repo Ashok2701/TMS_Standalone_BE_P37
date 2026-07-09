@@ -272,6 +272,39 @@ public class TripLockService {
         log.info("XX10CLODSTOH written for {}", trip.getTripCode());
     }
 
+    // ── Update doc status on VALIDATE ────────────────────────
+    @SuppressWarnings("unchecked")
+    private void updateDocStatusOnValidate(XrTrip trip, String x3) {
+        if (trip.getStopObjectsJson() == null || trip.getStopObjectsJson().isBlank()) return;
+        try {
+            List<Map<String, Object>> stops = objectMapper.readValue(
+                trip.getStopObjectsJson(),
+                objectMapper.getTypeFactory().constructCollectionType(List.class, Map.class)
+            );
+            for (Map<String, Object> stop : stops) {
+                String docNum = getString(stop, "txn", "docNum", "id");
+                String type   = getString(stop, "type", "stopType");
+                if (docNum == null) continue;
+
+                if ("PICKUP".equals(type)) {
+                    sqlServerJdbc.update(
+                        "UPDATE " + x3 + ".STOPREH SET XDLV_STATUS_0 = 2 WHERE PRHNUM_0 = ?",
+                        docNum
+                    );
+                } else {
+                    sqlServerJdbc.update(
+                        "UPDATE " + x3 + ".SDELIVERY SET XDLV_STATUS_0 = 2 WHERE SDHNUM_0 = ?",
+                        docNum
+                    );
+                }
+            }
+            log.info("VALIDATE: XDLV_STATUS_0 = 2 set for {} stops of trip {}",
+                stops.size(), trip.getTripCode());
+        } catch (Exception e) {
+            log.warn("Validate doc status update failed for {}: {}", trip.getTripCode(), e.getMessage());
+        }
+    }
+
     // ── Helpers ───────────────────────────────────────────────
     private XrTrip findTrip(Long id) {
         return tripRepository.findById(id)
