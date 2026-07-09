@@ -408,7 +408,7 @@ public class TripServiceImpl implements TripService {
                             + "XNUMPC_0 = ?, "       // trip code
                             + "XDRIVER_0 = ?, "      // driver id
                             + "CODEYVE_0 = ?, "      // vehicle code
-                            + "XDLVSTATUS_0 = 1 "    // status = Allocated
+                            + "XDLV_STATUS_0 = 1 "    // status = Allocated
                             + "WHERE PRHNUM_0 = ?",
                         code, driver, veh, docNum
                     );
@@ -418,7 +418,7 @@ public class TripServiceImpl implements TripService {
                             + "XNUMPC_0 = ?, "       // trip code
                             + "XDRIVER_0 = ?, "      // driver id
                             + "CODEYVE_0 = ?, "      // vehicle code
-                            + "XDLVSTATUS_0 = 1 "    // status = Allocated
+                            + "XDLV_STATUS_0 = 1 "    // status = Allocated
                             + "WHERE SDHNUM_0 = ?",
                         code, driver, veh, docNum
                     );
