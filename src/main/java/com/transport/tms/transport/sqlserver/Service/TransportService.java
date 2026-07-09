@@ -1,44 +1,41 @@
 package com.transport.tms.transport.sqlserver.Service;
 
-
+import com.transport.tms.Sync.Site.Entity.XRSite;
+import com.transport.tms.Sync.Site.Repository.RoutePlannerSiteRepository;
 import com.transport.tms.transport.sqlserver.Dto.SiteDTO;
-import com.transport.tms.transport.sqlserver.Entity.sites;
-import com.transport.tms.transport.sqlserver.repository.SiteX3Repository;
 import jakarta.transaction.Transactional;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 
-import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Legacy transport/sites endpoint — now served from Postgres xr_site
+ * (previously queried X3 TMSNEW.XTMSUSRFCY which may not exist)
+ */
 @Slf4j
 @Service
 @Transactional
+@RequiredArgsConstructor
 public class TransportService {
 
-    @Autowired
-    private SiteX3Repository siteX3Repository;
+    private final RoutePlannerSiteRepository siteRepository;
 
     public List<SiteDTO> getSites() {
-        List<sites> sitesdata = siteX3Repository.findAll();
-        List<SiteDTO> list = new ArrayList<>();
-        for (sites eachsite : sitesdata) {
-            try {
-                SiteDTO eachDTO = new SiteDTO();
-                eachDTO.setFcy(eachsite.getFcy());
-                eachDTO.setFcynam(eachsite.getFcynam());
-                eachDTO.setCry(eachsite.getCry());
-                eachDTO.setXx10c_geox(eachsite.getXx10c_geox());
-                eachDTO.setXx10c_geoy(eachsite.getXx10c_geoy());
-                eachDTO.setFcyNumber(eachsite.getFcyNumber());
+        return siteRepository.findAll().stream()
+                .filter(s -> Boolean.TRUE.equals(s.getActive()))
+                .map(this::toDTO)
+                .toList();
+    }
 
-                list.add(eachDTO);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-        return list;
+    private SiteDTO toDTO(XRSite s) {
+        SiteDTO dto = new SiteDTO();
+        dto.setFcy(s.getSiteCode());
+        dto.setFcynam(s.getSiteName());
+        dto.setCry(s.getCountryCode());
+        dto.setXx10c_geox(s.getLatitude()  != null ? s.getLatitude().toPlainString()  : null);
+        dto.setXx10c_geoy(s.getLongitude() != null ? s.getLongitude().toPlainString() : null);
+        return dto;
     }
 }

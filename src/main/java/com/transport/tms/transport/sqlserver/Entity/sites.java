@@ -12,7 +12,7 @@ import lombok.Setter;
     @Setter
     @Entity
     // NOTE: schema must match x3.schema in application.properties
-    @Table(name = "\"XTMSUSRFCY\"", schema = "\"TMSNEW\"")
+    @Table(name = "XTMSUSRFCY", schema = "TMSNEW")
     public class sites {
 
         @Column(name= "XFCY_0")
