@@ -59,7 +59,6 @@ COMMENT ON COLUMN tms.xr_vehicle.site IS 'Site/facility code — FK to xr_site.s
 ALTER TABLE tms.xr_vehicle
     ADD COLUMN IF NOT EXISTS departure_site  VARCHAR(20)  NULL,
     ADD COLUMN IF NOT EXISTS arrival_site    VARCHAR(20)  NULL,
-    ADD COLUMN IF NOT EXISTS image_url       VARCHAR(500) NULL,
     ADD COLUMN IF NOT EXISTS start_time      VARCHAR(10)  NULL,
     ADD COLUMN IF NOT EXISTS max_pallets     INTEGER      NULL,
     ADD COLUMN IF NOT EXISTS max_cases       INTEGER      NULL;

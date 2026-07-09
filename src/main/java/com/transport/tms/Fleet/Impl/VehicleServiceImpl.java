@@ -87,7 +87,6 @@ public class VehicleServiceImpl
         entity.setSite(dto.getSite());
         entity.setDepartureSite(dto.getDepartureSite());
         entity.setArrivalSite(dto.getArrivalSite());
-        entity.setImageUrl(dto.getImageUrl());
         entity.setStartTime(dto.getStartTime());
         entity.setMaxPallets(dto.getMaxPallets());
         entity.setMaxCases(dto.getMaxCases());
@@ -144,7 +143,6 @@ public class VehicleServiceImpl
         entity.setSite(dto.getSite());
         entity.setDepartureSite(dto.getDepartureSite());
         entity.setArrivalSite(dto.getArrivalSite());
-        entity.setImageUrl(dto.getImageUrl());
         entity.setStartTime(dto.getStartTime());
         entity.setMaxPallets(dto.getMaxPallets());
         entity.setMaxCases(dto.getMaxCases());
@@ -216,7 +214,6 @@ public class VehicleServiceImpl
         dto.setSite(entity.getSite());
         dto.setDepartureSite(entity.getDepartureSite());
         dto.setArrivalSite(entity.getArrivalSite());
-        dto.setImageUrl(entity.getImageUrl());
         dto.setStartTime(entity.getStartTime());
         dto.setMaxPallets(entity.getMaxPallets());
         dto.setMaxCases(entity.getMaxCases());

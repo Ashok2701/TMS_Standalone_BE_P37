@@ -66,9 +66,6 @@ public class Vehicle {
     @Column(name = "arrival_site")
     private String arrivalSite;    // arrival site code
 
-    @Column(name = "image_url", length = 500)
-    private String imageUrl;       // vehicle photo URL
-
     @Column(name = "start_time")
     private String startTime;      // default start time HH:MM e.g. "07:00"
 
