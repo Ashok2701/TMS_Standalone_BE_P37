@@ -31,9 +31,9 @@ public class VehicleDTO {
     private String     weightUnit;
 
     // Site / Depot
-    private String     siteCode;
-    private String     startDepot;
-    private String     endDepot;
+    private String     site;
+    private String     departureSite;
+    private String     arrivalSite;
     private String     arrivalDeparture;
 
     // Timing

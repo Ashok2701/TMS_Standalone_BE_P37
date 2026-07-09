@@ -26,9 +26,9 @@ public class RoutePlannerVehicleDTO {
     private String     weightUnit;
 
     // Site / Depot
-    private String     siteCode;           // site this vehicle belongs to
-    private String     startDepot;         // departure depot
-    private String     endDepot;           // arrival depot
+    private String     site;           // site (xr_site.site_code)
+    private String     departureSite;         // departure site
+    private String     arrivalSite;           // arrival site
     private String     earliestStartTime;  // HH:MM
 
     // Cost (used by VROOM)

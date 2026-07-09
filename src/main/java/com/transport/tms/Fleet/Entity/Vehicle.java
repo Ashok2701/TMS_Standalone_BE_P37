@@ -62,14 +62,14 @@ public class Vehicle {
     private String weightUnit;
 
     // ── Site / depot ──────────────────────────────────────────
-    @Column(name = "site_code")
-    private String siteCode;          // site this vehicle belongs to
+    @Column(name = "site")
+    private String site;          // site (xr_site.site_code)
 
-    @Column(name = "start_depot")
-    private String startDepot;        // departure depot/site
+    @Column(name = "departure_site")
+    private String departureSite;        // departure site/site
 
-    @Column(name = "end_depot")
-    private String endDepot;          // arrival depot/site
+    @Column(name = "arrival_site")
+    private String arrivalSite;          // arrival site/site
 
     @Column(name = "arrival_departure")
     private String arrivalDeparture;  // arrival/departure config

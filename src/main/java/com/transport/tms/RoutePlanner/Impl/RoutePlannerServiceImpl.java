@@ -107,7 +107,7 @@ public class RoutePlannerServiceImpl implements RoutePlannerService {
 
         // ── 8. Build response ─────────────────────────────────
         RoutePlannerResponseDTO response = new RoutePlannerResponseDTO();
-        response.setSiteCode(siteCode);
+        response.setSite(siteCode);
         response.setSiteName(site.getSiteName());
         response.setPlanDate(planDate);
         response.setSite(mapSite(site));
@@ -218,7 +218,7 @@ public class RoutePlannerServiceImpl implements RoutePlannerService {
     // ─────────────────────────────────────────────────────────
     private RoutePlannerSiteDTO mapSite(XRSite s) {
         RoutePlannerSiteDTO dto = new RoutePlannerSiteDTO();
-        dto.setSiteCode(s.getSiteCode());
+        dto.setSite(s.getSite());
         dto.setSiteName(s.getSiteName());
         dto.setLatitude(s.getLatitude());
         dto.setLongitude(s.getLongitude());
@@ -244,9 +244,9 @@ public class RoutePlannerServiceImpl implements RoutePlannerService {
         dto.setVolumeUnit(v.getVolumeUnit());
         dto.setWeightUnit(v.getWeightUnit());
         // Site / Depot
-        dto.setSiteCode(v.getSiteCode());
-        dto.setStartDepot(v.getStartDepot());
-        dto.setEndDepot(v.getEndDepot());
+        dto.setSite(v.getSite());
+        dto.setDepartureSite(v.getDepartureSite());
+        dto.setArrivalSite(v.getArrivalSite());
         dto.setEarliestStartTime(v.getEarliestStartTime());
         // Cost
         dto.setFixedCost(v.getFixedCost());

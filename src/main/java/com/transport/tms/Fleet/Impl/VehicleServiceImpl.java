@@ -89,9 +89,9 @@ public class VehicleServiceImpl implements VehicleService {
         e.setWeightUnit(dto.getWeightUnit());
 
         // Site / Depot
-        e.setSiteCode(dto.getSiteCode());
-        e.setStartDepot(dto.getStartDepot());
-        e.setEndDepot(dto.getEndDepot());
+        e.setSite(dto.getSite());
+        e.setDepartureSite(dto.getDepartureSite());
+        e.setArrivalSite(dto.getArrivalSite());
         e.setArrivalDeparture(dto.getArrivalDeparture());
 
         // Timing
@@ -181,9 +181,9 @@ public class VehicleServiceImpl implements VehicleService {
         dto.setVolumeUnit(e.getVolumeUnit());
         dto.setWeightUnit(e.getWeightUnit());
 
-        dto.setSiteCode(e.getSiteCode());
-        dto.setStartDepot(e.getStartDepot());
-        dto.setEndDepot(e.getEndDepot());
+        dto.setSite(e.getSite());
+        dto.setDepartureSite(e.getDepartureSite());
+        dto.setArrivalSite(e.getArrivalSite());
         dto.setArrivalDeparture(e.getArrivalDeparture());
 
         dto.setEarliestStartTime(e.getEarliestStartTime());
