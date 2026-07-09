@@ -38,6 +38,12 @@ public class VehicleDTO {
     private String driverId;
 
     private String site;
+    private String departureSite;
+    private String arrivalSite;
+    private String imageUrl;
+    private String startTime;
+    private Integer maxPallets;
+    private Integer maxCases;
 
     private Boolean active;
 

@@ -84,8 +84,13 @@ public class VehicleServiceImpl
         entity.setDriverId(
                 dto.getDriverId());
 
-        entity.setSite(
-                dto.getSite());
+        entity.setSite(dto.getSite());
+        entity.setDepartureSite(dto.getDepartureSite());
+        entity.setArrivalSite(dto.getArrivalSite());
+        entity.setImageUrl(dto.getImageUrl());
+        entity.setStartTime(dto.getStartTime());
+        entity.setMaxPallets(dto.getMaxPallets());
+        entity.setMaxCases(dto.getMaxCases());
 
         entity.setVehicleStatus(
                 dto.getVehicleStatus());
@@ -137,6 +142,12 @@ public class VehicleServiceImpl
         entity.setWeightUnit(dto.getWeightUnit());
         entity.setDriverId(dto.getDriverId());
         entity.setSite(dto.getSite());
+        entity.setDepartureSite(dto.getDepartureSite());
+        entity.setArrivalSite(dto.getArrivalSite());
+        entity.setImageUrl(dto.getImageUrl());
+        entity.setStartTime(dto.getStartTime());
+        entity.setMaxPallets(dto.getMaxPallets());
+        entity.setMaxCases(dto.getMaxCases());
         entity.setVehicleStatus(dto.getVehicleStatus());
         entity.setActive(dto.getActive());
 
@@ -203,6 +214,12 @@ public class VehicleServiceImpl
 
         dto.setDriverId(entity.getDriverId());
         dto.setSite(entity.getSite());
+        dto.setDepartureSite(entity.getDepartureSite());
+        dto.setArrivalSite(entity.getArrivalSite());
+        dto.setImageUrl(entity.getImageUrl());
+        dto.setStartTime(entity.getStartTime());
+        dto.setMaxPallets(entity.getMaxPallets());
+        dto.setMaxCases(entity.getMaxCases());
 
         dto.setVehicleStatus(entity.getVehicleStatus());
 

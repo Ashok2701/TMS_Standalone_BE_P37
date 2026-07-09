@@ -236,6 +236,12 @@ public class RoutePlannerServiceImpl implements RoutePlannerService {
         dto.setVehicleNumber(v.getVehicleNumber());
         dto.setDriverId(v.getDriverId());
         dto.setSite(v.getSite());
+        dto.setDepartureSite(v.getDepartureSite());
+        dto.setArrivalSite(v.getArrivalSite());
+        dto.setImageUrl(v.getImageUrl());
+        dto.setStartTime(v.getStartTime());
+        dto.setMaxPallets(v.getMaxPallets());
+        dto.setMaxCases(v.getMaxCases());
         dto.setVehicleStatus(v.getVehicleStatus());
         dto.setCapacityWeight(v.getCapacityWeight());
         dto.setCapacityVolume(v.getCapacityVolume());

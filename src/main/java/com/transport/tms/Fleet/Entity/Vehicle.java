@@ -58,7 +58,25 @@ public class Vehicle {
     private String driverId;
 
     @Column(name = "site")
-    private String site;   // site/facility code — xr_site.site_code
+    private String site;           // site/facility code — xr_site.site_code
+
+    @Column(name = "departure_site")
+    private String departureSite;  // departure site code
+
+    @Column(name = "arrival_site")
+    private String arrivalSite;    // arrival site code
+
+    @Column(name = "image_url", length = 500)
+    private String imageUrl;       // vehicle photo URL
+
+    @Column(name = "start_time")
+    private String startTime;      // default start time HH:MM e.g. "07:00"
+
+    @Column(name = "max_pallets")
+    private Integer maxPallets;    // max pallet count
+
+    @Column(name = "max_cases")
+    private Integer maxCases;      // max cases count
 
     @Column(name = "active")
     private Boolean active = true;
