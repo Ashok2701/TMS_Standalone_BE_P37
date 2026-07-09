@@ -57,6 +57,9 @@ public class Vehicle {
     @Column(name = "driver_id")
     private String driverId;
 
+    @Column(name = "site")
+    private String site;   // site/facility code — xr_site.site_code
+
     @Column(name = "active")
     private Boolean active = true;
 

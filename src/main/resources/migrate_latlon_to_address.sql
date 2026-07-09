@@ -41,3 +41,14 @@ ALTER TABLE tms.xr_site
 -- Set all existing records as active
 UPDATE tms.xr_customer_address SET active = TRUE WHERE active IS NULL;
 UPDATE tms.xr_site              SET active = TRUE WHERE active IS NULL;
+
+-- ============================================================
+-- Add site column to xr_vehicle
+-- ============================================================
+ALTER TABLE tms.xr_vehicle
+    ADD COLUMN IF NOT EXISTS site VARCHAR(20) NULL;
+
+-- Optional: index for filtering vehicles by site
+CREATE INDEX IF NOT EXISTS idx_xr_vehicle_site ON tms.xr_vehicle (site);
+
+COMMENT ON COLUMN tms.xr_vehicle.site IS 'Site/facility code — FK to xr_site.site_code';

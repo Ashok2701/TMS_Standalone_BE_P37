@@ -37,6 +37,8 @@ public class VehicleDTO {
 
     private String driverId;
 
+    private String site;
+
     private Boolean active;
 
     private Short vehicleStatus;

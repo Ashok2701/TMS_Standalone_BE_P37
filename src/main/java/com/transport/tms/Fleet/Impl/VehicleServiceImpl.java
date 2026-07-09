@@ -84,6 +84,9 @@ public class VehicleServiceImpl
         entity.setDriverId(
                 dto.getDriverId());
 
+        entity.setSite(
+                dto.getSite());
+
         entity.setVehicleStatus(
                 dto.getVehicleStatus());
 
@@ -133,6 +136,7 @@ public class VehicleServiceImpl
         entity.setVolumeUnit(dto.getVolumeUnit());
         entity.setWeightUnit(dto.getWeightUnit());
         entity.setDriverId(dto.getDriverId());
+        entity.setSite(dto.getSite());
         entity.setVehicleStatus(dto.getVehicleStatus());
         entity.setActive(dto.getActive());
 
@@ -198,6 +202,7 @@ public class VehicleServiceImpl
         dto.setWeightUnit(entity.getWeightUnit());
 
         dto.setDriverId(entity.getDriverId());
+        dto.setSite(entity.getSite());
 
         dto.setVehicleStatus(entity.getVehicleStatus());
 

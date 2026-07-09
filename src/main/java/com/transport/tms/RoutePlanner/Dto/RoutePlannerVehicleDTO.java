@@ -39,4 +39,7 @@ public class RoutePlannerVehicleDTO {
 
     // Assigned driver (from xr_vehicle.driver_id)
     private String driverId;
+
+    // Site/facility this vehicle belongs to
+    private String site;
 }
