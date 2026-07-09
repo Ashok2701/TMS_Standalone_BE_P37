@@ -395,7 +395,7 @@ public class TripServiceImpl implements TripService {
                             + "XDRIVER_0 = ?, "      // driver id
                             + "CODEYVE_0 = ?, "      // vehicle code
                             + "XDLVSTATUS_0 = 1 "    // status = Allocated
-                            + "WHERE VCRNUM_0 = ?",
+                            + "WHERE PRHNUM_0 = ?",
                         code, driver, veh, docNum
                     );
                 } else {
@@ -441,7 +441,7 @@ public class TripServiceImpl implements TripService {
                         "UPDATE " + x3 + ".STOPREH SET "
                             + "XDEPTIME_0 = ?, "     // departure time HH:MM
                             + "XARVTIME_0 = ? "      // arrival time HH:MM
-                            + "WHERE VCRNUM_0 = ?",
+                            + "WHERE PRHNUM_0 = ?",
                         depTime, arrTime, docNum
                     );
                 } else {
