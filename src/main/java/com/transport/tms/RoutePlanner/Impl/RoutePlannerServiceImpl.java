@@ -107,7 +107,7 @@ public class RoutePlannerServiceImpl implements RoutePlannerService {
 
         // ── 8. Build response ─────────────────────────────────
         RoutePlannerResponseDTO response = new RoutePlannerResponseDTO();
-        response.setSite(siteCode);
+        response.setSiteCode(siteCode);
         response.setSiteName(site.getSiteName());
         response.setPlanDate(planDate);
         response.setSite(mapSite(site));
@@ -218,7 +218,7 @@ public class RoutePlannerServiceImpl implements RoutePlannerService {
     // ─────────────────────────────────────────────────────────
     private RoutePlannerSiteDTO mapSite(XRSite s) {
         RoutePlannerSiteDTO dto = new RoutePlannerSiteDTO();
-        dto.setSite(s.getSite());
+        dto.setSiteCode(s.getSiteCode());
         dto.setSiteName(s.getSiteName());
         dto.setLatitude(s.getLatitude());
         dto.setLongitude(s.getLongitude());
