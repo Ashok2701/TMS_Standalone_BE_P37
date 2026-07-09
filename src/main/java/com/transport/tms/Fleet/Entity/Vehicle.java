@@ -62,7 +62,7 @@ public class Vehicle {
     private String weightUnit;
 
     // ── Site / depot ──────────────────────────────────────────
-    @Column(name = "site")
+    @Column(name = "site_code")
     private String site;          // site (xr_site.site_code)
 
     @Column(name = "departure_site")
