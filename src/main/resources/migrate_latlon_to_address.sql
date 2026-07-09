@@ -41,3 +41,30 @@ ALTER TABLE tms.xr_site
 -- Set all existing records as active
 UPDATE tms.xr_customer_address SET active = TRUE WHERE active IS NULL;
 UPDATE tms.xr_site              SET active = TRUE WHERE active IS NULL;
+
+-- ============================================================
+-- Create xr_vehicle_driver_assignment table
+-- ============================================================
+CREATE TABLE IF NOT EXISTS tms.xr_vehicle_driver_assignment (
+    assignment_id   UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
+    vehicle_code    VARCHAR(15)     NOT NULL REFERENCES tms.xr_vehicle(vehicle_code),
+    driver_id       VARCHAR(50)     NOT NULL REFERENCES tms.xr_driver(driver_id),
+    start_date      DATE            NOT NULL,
+    end_date        DATE            NULL,
+    active          BOOLEAN         DEFAULT TRUE,
+    remarks         VARCHAR(500)    NULL,
+    created_by      VARCHAR(50)     NULL,
+    created_at      TIMESTAMP       DEFAULT NOW(),
+    updated_by      VARCHAR(50)     NULL,
+    updated_at      TIMESTAMP       DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_xr_vda_vehicle ON tms.xr_vehicle_driver_assignment (vehicle_code);
+CREATE INDEX IF NOT EXISTS idx_xr_vda_driver  ON tms.xr_vehicle_driver_assignment (driver_id);
+CREATE INDEX IF NOT EXISTS idx_xr_vda_active  ON tms.xr_vehicle_driver_assignment (active);
+
+-- ============================================================
+-- Add image column to xr_driver
+-- ============================================================
+ALTER TABLE tms.xr_driver
+    ADD COLUMN IF NOT EXISTS driver_image BYTEA NULL;

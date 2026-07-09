@@ -4,6 +4,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Getter
 @Setter
@@ -58,4 +59,13 @@ public class DriverDTO {
     private Boolean longHaulDriver;
 
     private String notes;
+
+    // Image — Base64 encoded for JSON transport
+    private String image;
+
+    // Audit
+    private String        createdBy;
+    private LocalDateTime createdAt;
+    private String        updatedBy;
+    private LocalDateTime updatedAt;
 }

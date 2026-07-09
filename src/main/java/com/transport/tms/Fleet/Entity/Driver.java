@@ -90,6 +90,9 @@ public class Driver {
     @Column(name = "notes")
     private String notes;
 
+    @Column(name = "driver_image")
+    private byte[] driverImage;  // binary photo — BYTEA
+
     @Column(name = "created_by")
     private String createdBy;
 

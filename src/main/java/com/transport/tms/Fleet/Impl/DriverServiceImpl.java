@@ -15,6 +15,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 
@@ -88,7 +89,14 @@ public class DriverServiceImpl
         entity.setAllowAllVehicles(dto.getAllowAllVehicles());
         entity.setLongHaulDriver(dto.getLongHaulDriver());
         entity.setNotes(dto.getNotes());
-
+        if (dto.getImage() != null && !dto.getImage().isBlank()) {
+            try {
+                String b64 = dto.getImage().contains(",")
+                        ? dto.getImage().split(",")[1]
+                        : dto.getImage();
+                entity.setDriverImage(Base64.getDecoder().decode(b64));
+            } catch (Exception ignored) {}
+        }
         entity.setUpdatedAt(
                 LocalDateTime.now());
 
@@ -123,29 +131,33 @@ public class DriverServiceImpl
         repository.deleteById(driverId);
     }
 
-    private DriverDTO mapToDTO(
-            Driver entity) {
-
-        DriverDTO dto =
-                new DriverDTO();
-
-        BeanUtils.copyProperties(
-                entity,
-                dto);
-
+    private DriverDTO mapToDTO(Driver entity) {
+        DriverDTO dto = new DriverDTO();
+        BeanUtils.copyProperties(entity, dto);
+        // Image: encode binary → Base64
+        if (entity.getDriverImage() != null && entity.getDriverImage().length > 0) {
+            dto.setImage("data:image/jpeg;base64,"
+                    + Base64.getEncoder().encodeToString(entity.getDriverImage()));
+        }
+        dto.setCreatedBy(entity.getCreatedBy());
+        dto.setCreatedAt(entity.getCreatedAt());
+        dto.setUpdatedBy(entity.getUpdatedBy());
+        dto.setUpdatedAt(entity.getUpdatedAt());
         return dto;
     }
 
-    private Driver mapToEntity(
-            DriverDTO dto) {
-
-        Driver entity =
-                new Driver();
-
-        BeanUtils.copyProperties(
-                dto,
-                entity);
-
+    private Driver mapToEntity(DriverDTO dto) {
+        Driver entity = new Driver();
+        BeanUtils.copyProperties(dto, entity);
+        // Image: decode Base64 → binary
+        if (dto.getImage() != null && !dto.getImage().isBlank()) {
+            try {
+                String b64 = dto.getImage().contains(",")
+                        ? dto.getImage().split(",")[1]
+                        : dto.getImage();
+                entity.setDriverImage(Base64.getDecoder().decode(b64));
+            } catch (Exception ignored) {}
+        }
         return entity;
     }
 }
