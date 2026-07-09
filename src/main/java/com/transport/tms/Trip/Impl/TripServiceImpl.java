@@ -84,14 +84,14 @@ public class TripServiceImpl implements TripService {
     // ── READ ONE ──────────────────────────────────────────────
     @Override
     @Transactional(readOnly = true)
-    public TripResponseDTO getTripById(Long id) {
-        return toDTO(findOrThrow(id));
+    public TripResponseDTO getTripById(String tripCode) {
+        return toDTO(findOrThrow(tripCode));
     }
 
     // ── UPDATE full ───────────────────────────────────────────
     @Override
-    public TripResponseDTO updateTrip(Long id, TripRequestDTO req) {
-        XrTrip trip = findOrThrow(id);
+    public TripResponseDTO updateTrip(String tripCode, TripRequestDTO req) {
+        XrTrip trip = findOrThrow(tripCode);
         mapRequestToEntity(req, trip);
         trip.setStops((req.getDrops() == null ? 0 : req.getDrops())
                     + (req.getPickups() == null ? 0 : req.getPickups()));
@@ -100,8 +100,8 @@ public class TripServiceImpl implements TripService {
 
     // ── PATCH status (lock / validate / open) ────────────────
     @Override
-    public TripResponseDTO updateStatus(Long id, TripStatusDTO dto) {
-        XrTrip trip = findOrThrow(id);
+    public TripResponseDTO updateStatus(String tripCode, TripStatusDTO dto) {
+        XrTrip trip = findOrThrow(tripCode);
         if (dto.getOptiStatus() != null) trip.setOptiStatus(dto.getOptiStatus());
         if (dto.getLockFlag()   != null) trip.setLockFlag(dto.getLockFlag());
         if (dto.getNotes()      != null) trip.setNotes(dto.getNotes());
@@ -112,8 +112,8 @@ public class TripServiceImpl implements TripService {
     // ── PATCH optimise ────────────────────────────────────────
     @Override
     @SuppressWarnings("unchecked")
-    public TripResponseDTO optimiseTrip(Long id, OptimisationRequestDTO req) {
-        XrTrip trip = findOrThrow(id);
+    public TripResponseDTO optimiseTrip(String tripCode, OptimisationRequestDTO req) {
+        XrTrip trip = findOrThrow(tripCode);
 
         // ── Status & settings ─────────────────────────────────
         trip.setOptiStatus("Optimised");
@@ -217,15 +217,15 @@ public class TripServiceImpl implements TripService {
 
     // ── DELETE ────────────────────────────────────────────────
     @Override
-    public void deleteTrip(Long id) {
-        XrTrip trip = findOrThrow(id);
+    public void deleteTrip(String tripCode) {
+        XrTrip trip = findOrThrow(tripCode);
         repo.delete(trip);
     }
 
     // ── Helpers ───────────────────────────────────────────────
-    private XrTrip findOrThrow(Long id) {
-        return repo.findById(id)
-                .orElseThrow(() -> new RuntimeException("Trip not found: " + id));
+    private XrTrip findOrThrow(String tripCode) {
+        return repo.findByTripCode(tripCode)
+                .orElseThrow(() -> new RuntimeException("Trip not found: " + tripCode));
     }
 
     // ── JSON helpers ─────────────────────────────────────────

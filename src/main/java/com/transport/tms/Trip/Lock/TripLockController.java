@@ -8,17 +8,17 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Lock / Validate / Unlock endpoints for TMS trips
+ * Lock / Validate / Unlock using tripCode (e.g. VR-KCC01-20260624-001)
  *
  * Single:
- *   POST /api/v1/trips/{id}/lock
- *   POST /api/v1/trips/{id}/validate
- *   POST /api/v1/trips/{id}/unlock
+ *   POST /api/v1/trips/{tripCode}/lock
+ *   POST /api/v1/trips/{tripCode}/validate
+ *   POST /api/v1/trips/{tripCode}/unlock
  *
- * Group (multiple trips at once):
- *   POST /api/v1/trips/group/lock
- *   POST /api/v1/trips/group/validate
- *   POST /api/v1/trips/group/unlock
+ * Group:
+ *   POST /api/v1/trips/group/lock      body: ["VR-KCC01-001","VR-KCC01-002"]
+ *   POST /api/v1/trips/group/validate  body: ["VR-KCC01-001"]
+ *   POST /api/v1/trips/group/unlock    body: ["VR-KCC01-001"]
  */
 @RestController
 @RequestMapping("/api/v1/trips")
@@ -27,82 +27,54 @@ public class TripLockController {
 
     private final TripLockService lockService;
 
-    // ── Single trip ───────────────────────────────────────────
-
-    @PostMapping("/{id}/lock")
+    @PostMapping("/{tripCode}/lock")
     public ResponseEntity<?> lock(
-            @PathVariable Long id,
+            @PathVariable String tripCode,
             @RequestParam(defaultValue = "SYSTEM") String userCode) {
-        lockService.lockTrip(id, userCode);
+        lockService.lockTrip(tripCode, userCode);
         return ResponseEntity.ok(Map.of(
-            "message", "Trip locked successfully",
-            "tripId", id,
-            "action", "LOCK"
-        ));
+            "message", "Trip locked", "tripCode", tripCode, "action", "LOCK"));
     }
 
-    @PostMapping("/{id}/validate")
+    @PostMapping("/{tripCode}/validate")
     public ResponseEntity<?> validate(
-            @PathVariable Long id,
+            @PathVariable String tripCode,
             @RequestParam(defaultValue = "SYSTEM") String userCode) {
-        lockService.validateTrip(id, userCode);
+        lockService.validateTrip(tripCode, userCode);
         return ResponseEntity.ok(Map.of(
-            "message", "Trip validated successfully — LVS created in X3",
-            "tripId", id,
-            "action", "VALIDATE"
-        ));
+            "message", "Trip validated — LVS created", "tripCode", tripCode, "action", "VALIDATE"));
     }
 
-    @PostMapping("/{id}/unlock")
+    @PostMapping("/{tripCode}/unlock")
     public ResponseEntity<?> unlock(
-            @PathVariable Long id,
+            @PathVariable String tripCode,
             @RequestParam(defaultValue = "SYSTEM") String userCode) {
-        lockService.unlockTrip(id, userCode);
+        lockService.unlockTrip(tripCode, userCode);
         return ResponseEntity.ok(Map.of(
-            "message", "Trip unlocked successfully",
-            "tripId", id,
-            "action", "UNLOCK"
-        ));
+            "message", "Trip unlocked", "tripCode", tripCode, "action", "UNLOCK"));
     }
-
-    // ── Group actions ─────────────────────────────────────────
 
     @PostMapping("/group/lock")
     public ResponseEntity<?> groupLock(
-            @RequestBody List<Long> tripIds,
+            @RequestBody List<String> tripCodes,
             @RequestParam(defaultValue = "SYSTEM") String userCode) {
-        lockService.lockTrips(tripIds, userCode);
-        return ResponseEntity.ok(Map.of(
-            "message", tripIds.size() + " trip(s) locked",
-            "count", tripIds.size(),
-            "action", "GROUP_LOCK"
-        ));
+        lockService.lockTrips(tripCodes, userCode);
+        return ResponseEntity.ok(Map.of("message", tripCodes.size() + " trip(s) locked", "action", "GROUP_LOCK"));
     }
 
     @PostMapping("/group/validate")
     public ResponseEntity<?> groupValidate(
-            @RequestBody List<Long> tripIds,
+            @RequestBody List<String> tripCodes,
             @RequestParam(defaultValue = "SYSTEM") String userCode) {
-        lockService.validateTrips(tripIds, userCode);
-        return ResponseEntity.ok(Map.of(
-            "message", tripIds.size() + " trip(s) validated",
-            "count", tripIds.size(),
-            "action", "GROUP_VALIDATE"
-        ));
+        lockService.validateTrips(tripCodes, userCode);
+        return ResponseEntity.ok(Map.of("message", tripCodes.size() + " trip(s) validated", "action", "GROUP_VALIDATE"));
     }
 
     @PostMapping("/group/unlock")
     public ResponseEntity<?> groupUnlock(
-            @RequestBody List<Long> tripIds,
+            @RequestBody List<String> tripCodes,
             @RequestParam(defaultValue = "SYSTEM") String userCode) {
-        for (Long id : tripIds) {
-            try { lockService.unlockTrip(id, userCode); }
-            catch (Exception e) { /* log and continue */ }
-        }
-        return ResponseEntity.ok(Map.of(
-            "message", tripIds.size() + " trip(s) unlocked",
-            "count", tripIds.size(),
-            "action", "GROUP_UNLOCK"
-        ));
+        lockService.unlockTrips(tripCodes, userCode);
+        return ResponseEntity.ok(Map.of("message", tripCodes.size() + " trip(s) unlocked", "action", "GROUP_UNLOCK"));
     }
 }

@@ -16,6 +16,7 @@ public interface TripRepository extends JpaRepository<XrTrip, Long> {
     List<XrTrip> findBySiteOrderByDocDateDescCreateDateAsc(String site);
 
     boolean existsByTripCode(String tripCode);
+    java.util.Optional<XrTrip> findByTripCode(String tripCode);
 
     @Query("SELECT COALESCE(MAX(t.startIndex), 0) FROM XrTrip t WHERE t.site = :site AND t.docDate = :docDate")
     int findMaxStartIndex(@Param("site") String site, @Param("docDate") LocalDate docDate);

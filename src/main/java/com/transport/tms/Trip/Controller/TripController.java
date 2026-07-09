@@ -40,23 +40,23 @@ public class TripController {
     }
 
     /** GET /api/v1/trips/{id} */
-    @GetMapping("/{id}")
-    public ResponseEntity<TripResponseDTO> getTripById(@PathVariable Long id) {
-        return ResponseEntity.ok(service.getTripById(id));
+    @GetMapping("/{tripCode}")
+    public ResponseEntity<TripResponseDTO> getTripById(@PathVariable String tripCode) {
+        return ResponseEntity.ok(service.getTripById(tripCode));
     }
 
     /** PUT /api/v1/trips/{id} — full update */
-    @PutMapping("/{id}")
+    @PutMapping("/{tripCode}")
     public ResponseEntity<TripResponseDTO> updateTrip(
-            @PathVariable Long id,
+            @PathVariable String tripCode,
             @RequestBody TripRequestDTO request) {
         return ResponseEntity.ok(service.updateTrip(id, request));
     }
 
     /** PATCH /api/v1/trips/{id}/status — lock / validate / open */
-    @PatchMapping("/{id}/status")
+    @PatchMapping("/{tripCode}/status")
     public ResponseEntity<TripResponseDTO> updateStatus(
-            @PathVariable Long id,
+            @PathVariable String tripCode,
             @RequestBody TripStatusDTO statusDTO) {
         return ResponseEntity.ok(service.updateStatus(id, statusDTO));
     }
@@ -70,17 +70,17 @@ public class TripController {
      *
      * Service merges stopResults into each stop in stopObjects JSONB by docNum match.
      */
-    @PatchMapping("/{id}/optimise")
+    @PatchMapping("/{tripCode}/optimise")
     public ResponseEntity<TripResponseDTO> optimiseTrip(
-            @PathVariable Long id,
+            @PathVariable String tripCode,
             @RequestBody OptimisationRequestDTO request) {
-        return ResponseEntity.ok(service.optimiseTrip(id, request));
+        return ResponseEntity.ok(service.optimiseTrip(tripCode, request));
     }
 
     /** DELETE /api/v1/trips/{id} */
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteTrip(@PathVariable Long id) {
-        service.deleteTrip(id);
+    @DeleteMapping("/{tripCode}")
+    public ResponseEntity<Void> deleteTrip(@PathVariable String tripCode) {
+        service.deleteTrip(tripCode);
         return ResponseEntity.noContent().build();
     }
 }

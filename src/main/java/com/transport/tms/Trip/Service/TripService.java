@@ -11,9 +11,9 @@ public interface TripService {
     TripResponseDTO createTrip(TripRequestDTO request);
     List<TripResponseDTO> getTripsBySiteAndDate(String site, LocalDate docDate);
     List<TripResponseDTO> getTripsBySite(String site);
-    TripResponseDTO getTripById(Long id);
+    TripResponseDTO getTripById(String tripCode);
     TripResponseDTO updateTrip(Long id, TripRequestDTO request);
     TripResponseDTO updateStatus(Long id, TripStatusDTO statusDTO);
-    TripResponseDTO optimiseTrip(Long id, OptimisationRequestDTO request);
-    void deleteTrip(Long id);
+    TripResponseDTO optimiseTrip(String tripCode, OptimisationRequestDTO request);
+    void deleteTrip(String tripCode);
 }
