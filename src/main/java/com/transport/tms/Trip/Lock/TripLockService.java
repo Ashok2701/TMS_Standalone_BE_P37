@@ -50,6 +50,10 @@ public class TripLockService {
         writePlanningHeader(trip, x3, userCode);
         writePlanningDetails(trip, x3, userCode);
 
+        // Update XX10TRIPS: lock=1, optistatus=Locked
+        try { sqlServerJdbc.update("UPDATE " + x3 + ".XX10TRIPS SET lock = 1, optistatus = ? WHERE TRIPCODE = ?", "Locked", trip.getTripCode()); }
+        catch (Exception e) { log.warn("XX10TRIPS lock update failed: {}", e.getMessage()); }
+
         trip.setOptiStatus("Locked");
         trip.setLockFlag(1);
         trip.setDatExec(LocalDateTime.now());
@@ -83,6 +87,16 @@ public class TripLockService {
         String code = trip.getTripCode();
         int d = sqlServerJdbc.update("DELETE FROM " + x3 + ".XX10CPLANCHD WHERE XNUMPC_0 = ?", code);
         int h = sqlServerJdbc.update("DELETE FROM " + x3 + ".XX10CPLANCHA WHERE XNUMPC_0 = ?", code);
+
+        // Reset XX10TRIPS.lock = 0
+        try {
+            sqlServerJdbc.update(
+                "UPDATE " + x3 + ".XX10TRIPS SET lock = 0, optistatus = 'Open' WHERE TRIPCODE = ?",
+                code
+            );
+        } catch (Exception e) {
+            log.warn("XX10TRIPS unlock update failed for {}: {}", code, e.getMessage());
+        }
 
         trip.setOptiStatus("Optimised");
         trip.setLockFlag(0);

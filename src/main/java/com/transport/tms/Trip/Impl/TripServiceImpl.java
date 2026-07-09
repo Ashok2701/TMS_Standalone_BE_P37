@@ -8,6 +8,9 @@ import com.transport.tms.Trip.Repository.TripRepository;
 import com.transport.tms.Trip.Service.TripService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.transport.tms.Trip.Dto.OptimisationRequestDTO;
+import com.transport.tms.Config.SchemaConfig;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.jdbc.core.JdbcTemplate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,7 +27,11 @@ import java.util.stream.Collectors;
 public class TripServiceImpl implements TripService {
 
     private final TripRepository repo;
-    private final ObjectMapper objectMapper;
+    private final ObjectMapper   objectMapper;
+    private final SchemaConfig   schemas;
+
+    @Qualifier("sqlServerJdbcTemplate")
+    private final JdbcTemplate   sqlServerJdbc;
 
     // ── CREATE ────────────────────────────────────────────────
     @Override
@@ -44,7 +51,20 @@ public class TripServiceImpl implements TripService {
         trip.setOptiStatus("Open");
         trip.setLockFlag(0);
 
-        return toDTO(repo.save(trip));
+        XrTrip saved = repo.save(trip);
+
+        // ── Update XX10TRIPS optistatus in X3 ────────────────
+        try {
+            String x3 = schemas.getX3Schema();
+            sqlServerJdbc.update(
+                "UPDATE " + x3 + ".XX10TRIPS SET optistatus = ? WHERE TRIPCODE = ?",
+                "Optimized", saved.getTripCode()
+            );
+        } catch (Exception e) {
+            System.err.println("Warning: XX10TRIPS update failed for " + saved.getTripCode() + ": " + e.getMessage());
+        }
+
+        return toDTO(saved);
     }
 
     // ── READ ALL by site + date ───────────────────────────────
@@ -323,4 +343,67 @@ public class TripServiceImpl implements TripService {
         dto.setUpdateDate(t.getUpdateDate());
         return dto;
     }
+    // ── Write trip to XX10TRIPS (X3 SQL Server) ──────────────
+    private void writeX3Trip(XrTrip trip) {
+        String x3 = schemas.getX3Schema();
+        // Upsert: delete + insert
+        sqlServerJdbc.update("DELETE FROM " + x3 + ".XX10TRIPS WHERE TRIPCODE = ?", trip.getTripCode());
+        sqlServerJdbc.update(
+            "INSERT INTO " + x3 + ".XX10TRIPS (TRIPCODE, optistatus, lock, FCY_0, DATLIV_0, VEHCODE, DRIVERID) VALUES (?,?,?,?,?,?,?)",
+            trip.getTripCode(),
+            "Open",
+            0,
+            trip.getSite(),
+            trip.getDocDate(),
+            trip.getVehicleCode(),
+            trip.getDriverId()
+        );
+    }
+
+    // ── Update SDELIVERY + STOPREH with trip code ─────────────
+    @SuppressWarnings("unchecked")
+    private void updateStopDocuments(XrTrip trip) {
+        if (trip.getStopObjectsJson() == null) return;
+        String x3 = schemas.getX3Schema();
+        String code = trip.getTripCode();
+
+        try {
+            java.util.List<java.util.Map<String, Object>> stops = objectMapper.readValue(
+                trip.getStopObjectsJson(),
+                objectMapper.getTypeFactory().constructCollectionType(java.util.List.class, java.util.Map.class)
+            );
+
+            for (java.util.Map<String, Object> stop : stops) {
+                String docNum = getString(stop, "txn", "docNum", "id");
+                String type   = getString(stop, "type", "stopType");
+                if (docNum == null) continue;
+
+                if ("PICKUP".equals(type)) {
+                    // Update pickup ticket
+                    sqlServerJdbc.update(
+                        "UPDATE " + x3 + ".STOPREH SET XX10C_NUMPC_0 = ? WHERE VCRNUM_0 = ?",
+                        code, docNum
+                    );
+                } else {
+                    // Update delivery
+                    sqlServerJdbc.update(
+                        "UPDATE " + x3 + ".SDELIVERY SET XX10C_NUMPC_0 = ? WHERE SDHNUM_0 = ?",
+                        code, docNum
+                    );
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Warning: stop document update failed: " + e.getMessage());
+        }
+    }
+
+    private String getString(java.util.Map<String, Object> m, String... keys) {
+        for (String k : keys) {
+            Object v = m.get(k);
+            if (v != null) return v.toString();
+        }
+        return null;
+    }
+
+
 }

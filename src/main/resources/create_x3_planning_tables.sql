@@ -111,3 +111,25 @@ BEGIN
     CREATE INDEX IDX_LODSTOH_FLAG ON [TMSNEW].[XX10CLODSTOH] (XLOADFLG_0)
 END
 GO
+
+-- ============================================================
+-- XX10TRIPS — TMS Trip master table
+-- Written when a trip is CONFIRMED from TMS
+-- Used by XTMSDLVY_TMS + XTMSPICK_TMS views for route status
+-- ============================================================
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name='XX10TRIPS' AND schema_id=SCHEMA_ID('TMSNEW'))
+BEGIN
+    CREATE TABLE [TMSNEW].[XX10TRIPS] (
+        TRIPCODE        NVARCHAR(30)    NOT NULL PRIMARY KEY,  -- Trip code e.g. VR-KCC01-20260624-001
+        optistatus      NVARCHAR(20)    NULL DEFAULT 'Open',   -- Open | Optimized | Locked
+        lock            INT             NULL DEFAULT 0,        -- 0=unlocked 1=locked
+        FCY_0           NVARCHAR(10)    NULL,                  -- Site/facility
+        DATLIV_0        DATE            NULL,                  -- Plan/delivery date
+        VEHCODE         NVARCHAR(20)    NULL,                  -- Vehicle code
+        DRIVERID        NVARCHAR(50)    NULL                   -- Driver ID
+    )
+    CREATE INDEX IDX_XX10TRIPS_FCY  ON [TMSNEW].[XX10TRIPS] (FCY_0)
+    CREATE INDEX IDX_XX10TRIPS_DATE ON [TMSNEW].[XX10TRIPS] (DATLIV_0)
+    CREATE INDEX IDX_XX10TRIPS_LOCK ON [TMSNEW].[XX10TRIPS] (lock)
+END
+GO
