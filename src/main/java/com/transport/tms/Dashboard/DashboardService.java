@@ -24,58 +24,58 @@ public class DashboardService {
     private final DriverRepository  driverRepo;
 
     // ── Main entry point ──────────────────────────────────────
-    public DashboardDTO getDashboard(String site, LocalDate date) {
+    public DashboardDTO getDashboard(String site, LocalDate startDate, LocalDate endDate) {
 
-        LocalDate today     = date != null ? date : LocalDate.now();
-        LocalDate yesterday = today.minusDays(1);
+        LocalDate today = LocalDate.now();
+        LocalDate from  = startDate != null ? startDate : today;
+        LocalDate to    = endDate   != null ? endDate   : today;
 
-        // Trips for today and yesterday
-        List<XrTrip> todayTrips = getTrips(site, today);
-        List<XrTrip> yestTrips  = getTrips(site, yesterday);
+        // "yesterday" relative to startDate for vs comparison
+        LocalDate prevFrom = from.minusDays(to.toEpochDay() - from.toEpochDay() + 1);
+        LocalDate prevTo   = from.minusDays(1);
 
-        // Active vehicles and drivers
+        List<XrTrip> rangeTrips = getTrips(site, from, to);
+        List<XrTrip> prevTrips  = getTrips(site, prevFrom, prevTo);
+
         List<Vehicle> allVehicles = getVehicles(site);
         List<Driver>  allDrivers  = driverRepo.findAll().stream()
                 .filter(d -> Boolean.TRUE.equals(d.getActive()))
                 .toList();
 
         return DashboardDTO.builder()
-                .activeTrips(    buildActiveTrips(todayTrips, yestTrips))
-                .vehiclesOnRoad( buildVehiclesOnRoad(todayTrips, allVehicles, yestTrips))
-                .driversOnDuty(  buildDriversOnDuty(todayTrips, yestTrips))
-                .deliveriesToday(buildDeliveries(todayTrips, yestTrips))
-                .fleetStatus(    buildFleetStatus(todayTrips, allVehicles, allDrivers))
-                .driverHours(    buildDriverHours(todayTrips, allDrivers))
+                .activeTrips(    buildActiveTrips(rangeTrips, prevTrips))
+                .vehiclesOnRoad( buildVehiclesOnRoad(rangeTrips, allVehicles, prevTrips))
+                .driversOnDuty(  buildDriversOnDuty(rangeTrips, prevTrips))
+                .deliveriesToday(buildDeliveries(rangeTrips, prevTrips))
+                .fleetStatus(    buildFleetStatus(rangeTrips, allVehicles, allDrivers))
+                .driverHours(    buildDriverHours(rangeTrips, allDrivers))
                 .build();
     }
 
     // ── KPI: Active Trips ─────────────────────────────────────
-    // All trips for the date regardless of status
-    private DashboardDTO.KpiCard buildActiveTrips(List<XrTrip> today, List<XrTrip> yesterday) {
-        int val  = today.size();
-        int yest = yesterday.size();
+    private DashboardDTO.KpiCard buildActiveTrips(List<XrTrip> range, List<XrTrip> prev) {
+        int val  = range.size();
+        int yest = prev.size();
+        int delta = val - yest;
         return DashboardDTO.KpiCard.builder()
                 .value(val)
-                .vsYesterday(val - yest)
-                .subtitle((val - yest) >= 0
-                        ? "+" + (val - yest) + " vs yesterday"
-                        : (val - yest) + " vs yesterday")
+                .vsYesterday(delta)
+                .subtitle((delta >= 0 ? "+" : "") + delta + " vs previous period")
                 .build();
     }
 
     // ── KPI: Vehicles on Road ─────────────────────────────────
-    // Vehicles with a LOCKED trip today (sent to X3 = on road)
     private DashboardDTO.KpiCard buildVehiclesOnRoad(
-            List<XrTrip> today, List<Vehicle> allVehicles, List<XrTrip> yesterday) {
+            List<XrTrip> range, List<Vehicle> allVehicles, List<XrTrip> prev) {
 
-        long onRoad = today.stream()
+        long onRoad = range.stream()
                 .filter(t -> t.getLockFlag() != null && t.getLockFlag() == 1)
                 .map(XrTrip::getVehicleCode)
                 .filter(Objects::nonNull)
                 .distinct()
                 .count();
 
-        long onRoadYest = yesterday.stream()
+        long onRoadPrev = prev.stream()
                 .filter(t -> t.getLockFlag() != null && t.getLockFlag() == 1)
                 .map(XrTrip::getVehicleCode)
                 .filter(Objects::nonNull)
@@ -83,72 +83,70 @@ public class DashboardService {
                 .count();
 
         int total = allVehicles.size();
-        double pct = total > 0 ? Math.round((double) onRoad / total * 1000.0) / 10.0 : 0;
+        double pct = total > 0
+                ? Math.round((double) onRoad / total * 1000.0) / 10.0
+                : 0.0;
 
         return DashboardDTO.KpiCard.builder()
                 .value((int) onRoad)
-                .vsYesterday((int)(onRoad - onRoadYest))
+                .vsYesterday((int)(onRoad - onRoadPrev))
                 .subtitle(pct + "% utilised")
                 .build();
     }
 
     // ── KPI: Drivers on Duty ─────────────────────────────────
-    // Distinct drivers with a locked trip today
     private DashboardDTO.KpiCard buildDriversOnDuty(
-            List<XrTrip> today, List<XrTrip> yesterday) {
+            List<XrTrip> range, List<XrTrip> prev) {
 
-        long onDuty = today.stream()
+        long onDuty = range.stream()
                 .filter(t -> t.getLockFlag() != null && t.getLockFlag() == 1)
                 .map(XrTrip::getDriverId)
                 .filter(Objects::nonNull)
                 .distinct()
                 .count();
 
-        long onDutyYest = yesterday.stream()
+        long onDutyPrev = prev.stream()
                 .filter(t -> t.getLockFlag() != null && t.getLockFlag() == 1)
                 .map(XrTrip::getDriverId)
                 .filter(Objects::nonNull)
                 .distinct()
                 .count();
 
-        // Drivers approaching hour limit
-        long approaching = countApproachingHourLimit(today);
+        long approaching = countApproachingHourLimit(range);
 
         return DashboardDTO.KpiCard.builder()
                 .value((int) onDuty)
-                .vsYesterday((int)(onDuty - onDutyYest))
+                .vsYesterday((int)(onDuty - onDutyPrev))
                 .subtitle(approaching > 0 ? approaching + " approaching hour limit" : "")
                 .build();
     }
 
-    // ── KPI: Deliveries Today ─────────────────────────────────
-    // Sum of drops + pickups across all trips today
+    // ── KPI: Deliveries ───────────────────────────────────────
     private DashboardDTO.KpiCard buildDeliveries(
-            List<XrTrip> today, List<XrTrip> yesterday) {
+            List<XrTrip> range, List<XrTrip> prev) {
 
-        int val = today.stream()
-                .mapToInt(t -> (t.getDrops() != null ? t.getDrops() : 0)
+        int val = range.stream()
+                .mapToInt(t -> (t.getDrops()   != null ? t.getDrops()   : 0)
                              + (t.getPickups() != null ? t.getPickups() : 0))
                 .sum();
 
-        int yest = yesterday.stream()
-                .mapToInt(t -> (t.getDrops() != null ? t.getDrops() : 0)
+        int prevVal = prev.stream()
+                .mapToInt(t -> (t.getDrops()   != null ? t.getDrops()   : 0)
                              + (t.getPickups() != null ? t.getPickups() : 0))
                 .sum();
 
         return DashboardDTO.KpiCard.builder()
                 .value(val)
-                .vsYesterday(val - yest)
-                .subtitle("94.1% on time")   // static for now
+                .vsYesterday(val - prevVal)
+                .subtitle("94.1% on time")
                 .build();
     }
 
-    // ── Fleet Status panel ────────────────────────────────────
+    // ── Fleet Status ──────────────────────────────────────────
     private DashboardDTO.FleetStatus buildFleetStatus(
-            List<XrTrip> todayTrips, List<Vehicle> allVehicles, List<Driver> allDrivers) {
+            List<XrTrip> rangeTrips, List<Vehicle> allVehicles, List<Driver> allDrivers) {
 
-        // Vehicles in a locked trip today = On Road
-        Set<String> onRoadCodes = todayTrips.stream()
+        Set<String> onRoadCodes = rangeTrips.stream()
                 .filter(t -> t.getLockFlag() != null && t.getLockFlag() == 1)
                 .map(XrTrip::getVehicleCode)
                 .filter(Objects::nonNull)
@@ -158,23 +156,18 @@ public class DashboardService {
         int onRoad      = (int) allVehicles.stream()
                             .filter(v -> onRoadCodes.contains(v.getVehicleCode()))
                             .count();
-        // vehicle_status: 1=Available, 2=Idle/Depot, 3=Maintenance
         int maintenance = (int) allVehicles.stream()
                             .filter(v -> v.getVehicleStatus() != null && v.getVehicleStatus() == 3)
                             .count();
-        int idle        = total - onRoad - maintenance;
-        if (idle < 0) idle = 0;
+        int idle        = Math.max(0, total - onRoad - maintenance);
 
-        // Trailers: vehicles with a trailer_number set
-        int trailers = (int) allVehicles.stream()
+        int trailers    = (int) allVehicles.stream()
                             .filter(v -> v.getTrailerNumber() != null
                                     && !v.getTrailerNumber().isBlank())
                             .count();
 
-        // Active drivers
         int driverCount = (int) allDrivers.stream()
-                            .filter(d -> d.getDriverStatus() != null
-                                    && d.getDriverStatus() == 1)
+                            .filter(d -> d.getDriverStatus() != null && d.getDriverStatus() == 1)
                             .count();
 
         double utilisationPct = total > 0
@@ -182,71 +175,61 @@ public class DashboardService {
                 : 0.0;
 
         return DashboardDTO.FleetStatus.builder()
-                .onRoad(onRoad)
-                .idleDepot(idle)
-                .maintenance(maintenance)
-                .total(total)
-                .trailers(trailers)
-                .drivers(driverCount)
+                .onRoad(onRoad).idleDepot(idle).maintenance(maintenance)
+                .total(total).trailers(trailers).drivers(driverCount)
                 .utilisationPct(utilisationPct)
                 .build();
     }
 
-    // ── Driver Hours Today ────────────────────────────────────
-    // Hours per driver = sum of (endTime - startTime) across all trips today
+    // ── Driver Hours ──────────────────────────────────────────
     private DashboardDTO.DriverHours buildDriverHours(
-            List<XrTrip> todayTrips, List<Driver> allDrivers) {
+            List<XrTrip> rangeTrips, List<Driver> allDrivers) {
 
-        // Group trips by driver, calculate total hours per driver
-        Map<String, Double> driverHoursMap = new HashMap<>();
-
-        for (XrTrip trip : todayTrips) {
+        // Group trips by driver → sum hours
+        Map<String, Double> hoursMap = new HashMap<>();
+        for (XrTrip trip : rangeTrips) {
             if (trip.getDriverId() == null) continue;
-            double hours = calcTripHours(trip.getStartTime(), trip.getEndTime());
-            driverHoursMap.merge(trip.getDriverId(), hours, Double::sum);
+            double h = calcTripHours(trip.getStartTime(), trip.getEndTime());
+            hoursMap.merge(trip.getDriverId(), h, Double::sum);
         }
 
-        int safe     = 0;
-        int caution  = 0;
-        int alert    = 0;
-        int maxHours = 10; // default
-
-        for (Map.Entry<String, Double> entry : driverHoursMap.entrySet()) {
-            double h = entry.getValue();
+        int safe = 0, caution = 0, alert = 0;
+        for (double h : hoursMap.values()) {
             if      (h < 8)  safe++;
             else if (h <= 10) caution++;
             else              alert++;
         }
 
         int warning = caution + alert;
-
         return DashboardDTO.DriverHours.builder()
-                .safe(safe)
-                .caution(caution)
-                .alert(alert)
-                .maxHoursPerDay(maxHours)
-                .subtitle("Max limit: " + maxHours + "h/day"
+                .safe(safe).caution(caution).alert(alert)
+                .maxHoursPerDay(10)
+                .subtitle("Max limit: 10h/day"
                         + (warning > 0 ? " · " + warning + " drivers on warning" : ""))
                 .build();
     }
 
     // ── Helpers ───────────────────────────────────────────────
 
-    private List<XrTrip> getTrips(String site, LocalDate date) {
-        if (site == null || site.isBlank() || "ALL".equalsIgnoreCase(site)) {
-            return tripRepo.findAll().stream()
-                    .filter(t -> date.equals(t.getDocDate()))
-                    .toList();
-        }
-        return tripRepo.findBySiteAndDocDateOrderByCreateDateAsc(site, date);
+    /** Fetch trips for site within date range (inclusive) */
+    private List<XrTrip> getTrips(String site, LocalDate from, LocalDate to) {
+        List<XrTrip> all = tripRepo.findAll();
+        return all.stream()
+                .filter(t -> t.getDocDate() != null
+                        && !t.getDocDate().isBefore(from)
+                        && !t.getDocDate().isAfter(to))
+                .filter(t -> site == null || site.isBlank()
+                        || "ALL".equalsIgnoreCase(site)
+                        || site.equals(t.getSite()))
+                .toList();
     }
 
     private List<Vehicle> getVehicles(String site) {
         return vehicleRepo.findAll().stream()
                 .filter(v -> Boolean.TRUE.equals(v.getActive()))
                 .filter(v -> site == null || site.isBlank()
-                          || "ALL".equalsIgnoreCase(site)
-                          || site.equals(v.getSite()))
+                        || "ALL".equalsIgnoreCase(site)
+                        || site.equals(v.getSite()))
                 .toList();
     }
 
@@ -256,11 +239,9 @@ public class DashboardService {
             if (t.getDriverId() == null) continue;
             hours.merge(t.getDriverId(), calcTripHours(t.getStartTime(), t.getEndTime()), Double::sum);
         }
-        // Approaching = between 8 and 10 hours
         return hours.values().stream().filter(h -> h >= 8 && h <= 10).count();
     }
 
-    /** Parse HH:MM time string → hours as double. Returns 0 if unparseable. */
     private double calcTripHours(String startTime, String endTime) {
         try {
             if (startTime == null || endTime == null
@@ -269,7 +250,7 @@ public class DashboardService {
             LocalTime start = LocalTime.parse(startTime.trim().substring(0, 5), fmt);
             LocalTime end   = LocalTime.parse(endTime.trim().substring(0, 5), fmt);
             int mins = end.toSecondOfDay() / 60 - start.toSecondOfDay() / 60;
-            if (mins < 0) mins += 24 * 60; // overnight trip
+            if (mins < 0) mins += 24 * 60;
             return mins / 60.0;
         } catch (Exception e) {
             return 0;
