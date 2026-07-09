@@ -65,10 +65,10 @@ public class Vehicle {
     @Column(name = "site_code")
     private String site;          // site (xr_site.site_code)
 
-    @Column(name = "departure_site")
+    @Column(name = "start_depot")
     private String departureSite;        // departure site/site
 
-    @Column(name = "arrival_site")
+    @Column(name = "end_depot")
     private String arrivalSite;          // arrival site/site
 
     @Column(name = "arrival_departure")
