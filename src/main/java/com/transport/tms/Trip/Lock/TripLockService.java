@@ -18,15 +18,23 @@ import java.util.Map;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class TripLockService {
 
     private final TripRepository tripRepository;
     private final SchemaConfig   schemas;
     private final ObjectMapper   objectMapper;
-
-    @Qualifier("sqlServerJdbcTemplate")
     private final JdbcTemplate   sqlServerJdbc;
+
+    public TripLockService(
+            TripRepository tripRepository,
+            SchemaConfig schemas,
+            ObjectMapper objectMapper,
+            @Qualifier("sqlServerJdbcTemplate") JdbcTemplate sqlServerJdbc) {
+        this.tripRepository = tripRepository;
+        this.schemas        = schemas;
+        this.objectMapper   = objectMapper;
+        this.sqlServerJdbc  = sqlServerJdbc;
+    }
 
     // ── LOCK ─────────────────────────────────────────────────
     @Transactional

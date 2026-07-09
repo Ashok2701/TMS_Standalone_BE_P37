@@ -22,16 +22,24 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 @Transactional
 public class TripServiceImpl implements TripService {
 
     private final TripRepository repo;
     private final ObjectMapper   objectMapper;
     private final SchemaConfig   schemas;
-
-    @Qualifier("sqlServerJdbcTemplate")
     private final JdbcTemplate   sqlServerJdbc;
+
+    public TripServiceImpl(
+            TripRepository repo,
+            ObjectMapper objectMapper,
+            SchemaConfig schemas,
+            @Qualifier("sqlServerJdbcTemplate") JdbcTemplate sqlServerJdbc) {
+        this.repo           = repo;
+        this.objectMapper   = objectMapper;
+        this.schemas        = schemas;
+        this.sqlServerJdbc  = sqlServerJdbc;
+    }
 
     // ── CREATE ────────────────────────────────────────────────
     @Override
