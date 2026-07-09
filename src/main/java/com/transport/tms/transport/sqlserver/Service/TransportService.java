@@ -1,7 +1,7 @@
 package com.transport.tms.transport.sqlserver.Service;
 
 import com.transport.tms.Sync.Site.Entity.XRSite;
-import com.transport.tms.Sync.Site.Repository.RoutePlannerSiteRepository;
+import com.transport.tms.RoutePlanner.Repository.RoutePlannerSiteRepository;
 import com.transport.tms.transport.sqlserver.Dto.SiteDTO;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
