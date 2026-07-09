@@ -64,6 +64,13 @@ public class TripServiceImpl implements TripService {
             System.err.println("Warning: XX10TRIPS update failed for " + saved.getTripCode() + ": " + e.getMessage());
         }
 
+        // Update departure/arrival times per stop in SDELIVERY + STOPREH
+        try {
+            updateStopTimes(saved);
+        } catch (Exception e) {
+            System.err.println("Warning: stop times update failed for " + saved.getTripCode() + ": " + e.getMessage());
+        }
+
         return toDTO(saved);
     }
 
@@ -360,12 +367,15 @@ public class TripServiceImpl implements TripService {
         );
     }
 
-    // ── Update SDELIVERY + STOPREH with trip code ─────────────
+    // ── Update SDELIVERY + STOPREH on CONFIRM ─────────────────
+    // Sets: trip code, driver, vehicle, delivery status = 1 (Allocated)
     @SuppressWarnings("unchecked")
     private void updateStopDocuments(XrTrip trip) {
         if (trip.getStopObjectsJson() == null) return;
-        String x3 = schemas.getX3Schema();
-        String code = trip.getTripCode();
+        String x3     = schemas.getX3Schema();
+        String code   = trip.getTripCode();
+        String driver = trip.getDriverId();
+        String veh    = trip.getVehicleCode();
 
         try {
             java.util.List<java.util.Map<String, Object>> stops = objectMapper.readValue(
@@ -379,21 +389,74 @@ public class TripServiceImpl implements TripService {
                 if (docNum == null) continue;
 
                 if ("PICKUP".equals(type)) {
-                    // Update pickup ticket
                     sqlServerJdbc.update(
-                        "UPDATE " + x3 + ".STOPREH SET XX10C_NUMPC_0 = ? WHERE VCRNUM_0 = ?",
-                        code, docNum
+                        "UPDATE " + x3 + ".STOPREH SET "
+                            + "XNUMPC_0 = ?, "       // trip code
+                            + "XDRIVER_0 = ?, "      // driver id
+                            + "CODEYVE_0 = ?, "      // vehicle code
+                            + "XDLVSTATUS_0 = 1 "    // status = Allocated
+                            + "WHERE VCRNUM_0 = ?",
+                        code, driver, veh, docNum
                     );
                 } else {
-                    // Update delivery
                     sqlServerJdbc.update(
-                        "UPDATE " + x3 + ".SDELIVERY SET XX10C_NUMPC_0 = ? WHERE SDHNUM_0 = ?",
-                        code, docNum
+                        "UPDATE " + x3 + ".SDELIVERY SET "
+                            + "XNUMPC_0 = ?, "       // trip code
+                            + "XDRIVER_0 = ?, "      // driver id
+                            + "CODEYVE_0 = ?, "      // vehicle code
+                            + "XDLVSTATUS_0 = 1 "    // status = Allocated
+                            + "WHERE SDHNUM_0 = ?",
+                        code, driver, veh, docNum
                     );
                 }
             }
+            System.out.println("X3 stop documents updated for trip: " + code);
         } catch (Exception e) {
             System.err.println("Warning: stop document update failed: " + e.getMessage());
+        }
+    }
+
+    // ── Update SDELIVERY + STOPREH on OPTIMISE ─────────────────
+    // Sets: arrival time, departure time per stop
+    @SuppressWarnings("unchecked")
+    private void updateStopTimes(XrTrip trip) {
+        if (trip.getStopObjectsJson() == null) return;
+        String x3 = schemas.getX3Schema();
+
+        try {
+            java.util.List<java.util.Map<String, Object>> stops = objectMapper.readValue(
+                trip.getStopObjectsJson(),
+                objectMapper.getTypeFactory().constructCollectionType(java.util.List.class, java.util.Map.class)
+            );
+
+            for (java.util.Map<String, Object> stop : stops) {
+                String docNum  = getString(stop, "txn", "docNum", "id");
+                String type    = getString(stop, "type", "stopType");
+                String depTime = getString(stop, "departureTime");
+                String arrTime = getString(stop, "arrivalTime");
+                if (docNum == null) continue;
+
+                if ("PICKUP".equals(type)) {
+                    sqlServerJdbc.update(
+                        "UPDATE " + x3 + ".STOPREH SET "
+                            + "XDEPTIME_0 = ?, "     // departure time HH:MM
+                            + "XARVTIME_0 = ? "      // arrival time HH:MM
+                            + "WHERE VCRNUM_0 = ?",
+                        depTime, arrTime, docNum
+                    );
+                } else {
+                    sqlServerJdbc.update(
+                        "UPDATE " + x3 + ".SDELIVERY SET "
+                            + "XDEPTIME_0 = ?, "     // departure time HH:MM
+                            + "XARVTIME_0 = ? "      // arrival time HH:MM
+                            + "WHERE SDHNUM_0 = ?",
+                        depTime, arrTime, docNum
+                    );
+                }
+            }
+            System.out.println("X3 stop times updated for trip: " + trip.getTripCode());
+        } catch (Exception e) {
+            System.err.println("Warning: stop time update failed: " + e.getMessage());
         }
     }
 
