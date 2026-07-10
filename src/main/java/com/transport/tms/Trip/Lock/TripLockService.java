@@ -202,7 +202,7 @@ public class TripLockService {
         // Status/IDs
         params.add(1);                    // OPTIMSTA_0 = 1
         params.add(site);                 // FCY_0
-        params.add(0);                    // XVRY_0
+        params.add(1);                    // XVRY_0 = 1 (Scheduled)
         params.add(emptyStr);             // JOBID_0
         // Distance/time
         params.add(totDist);              // TOTDISTANCE_0
