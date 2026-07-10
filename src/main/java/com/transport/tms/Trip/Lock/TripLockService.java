@@ -172,7 +172,7 @@ public class TripLockService {
             + "TRAILER_0,TRAILER_1,"
         );
         // XEQUIPID_0..98
-        for (int i = 0; i <= 98; i++) cols.append("XEQUIPID_").append(i).append("_0,");
+        for (int i = 0; i <= 98; i++) cols.append("XEQUIPID_").append(i).append(",");
         cols.append(
             "XOPERATION_0,XLOADBAY_0,XXSTATUS_0,XTAILGATE_0,XSOURCE_0,XLINKID_0,"
             + "XSDHPCKSTA_0,XACTDISTCKIN_0,XACTDISTCKOT_0,XOLDCODEYVE_0,"
