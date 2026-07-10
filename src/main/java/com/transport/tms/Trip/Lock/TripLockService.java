@@ -475,8 +475,9 @@ public class TripLockService {
         java.time.LocalDate  doc   = trip.getDocDate() != null ? trip.getDocDate() : java.time.LocalDate.now();
         LocalDateTime docDt  = doc.atStartOfDay();
 
-        // Generate LVS number: LVS-{tripCode}
-        String lvsNum = "LVS-" + trip.getTripCode();
+        // Generate LVS number: {SITE}{YY}{MM}XCHG{0000001}
+        // e.g. KCC012506XCHG0000001
+        String lvsNum = generateLvsNumber(trip.getSite(), trip.getDocDate(), x3);
 
         java.util.List<Object> p = new java.util.ArrayList<>();
         p.add(0);           // UPDTICK_0
@@ -658,6 +659,37 @@ public class TripLockService {
     }
 
     // ── Helpers ───────────────────────────────────────────────
+    // ── Generate LVS number: {SITE}{YY}{MM}XCHG{0000001} ──────
+    private String generateLvsNumber(String site, java.time.LocalDate docDate, String x3) {
+        try {
+            String s    = site != null ? site : "TMS";
+            // YY = 2-digit year, MM = 2-digit month
+            String yy   = String.format("%02d", (docDate != null ? docDate.getYear() : java.time.LocalDate.now().getYear()) % 100);
+            String mm   = String.format("%02d", docDate != null ? docDate.getMonthValue() : java.time.LocalDate.now().getMonthValue());
+            String prefix = s + yy + mm + "XCHG";
+
+            // Find max sequence for this site+year+month prefix
+            String sql = "SELECT MAX(VCRNUM_0) FROM " + x3 + ".XX10CLODSTOH "
+                       + "WHERE VCRNUM_0 LIKE ?";
+            String maxVal = sqlServerJdbc.queryForObject(sql, String.class, prefix + "%");
+
+            int nextSeq = 1;
+            if (maxVal != null && maxVal.length() > prefix.length()) {
+                try {
+                    nextSeq = Integer.parseInt(maxVal.substring(prefix.length())) + 1;
+                } catch (Exception ignored) {}
+            }
+            return prefix + String.format("%07d", nextSeq);
+        } catch (Exception e) {
+            // Fallback if table doesn't exist yet
+            log.warn("LVS number generation fallback: {}", e.getMessage());
+            String s  = site != null ? site : "TMS";
+            String yy = String.format("%02d", java.time.LocalDate.now().getYear() % 100);
+            String mm = String.format("%02d", java.time.LocalDate.now().getMonthValue());
+            return s + yy + mm + "XCHG" + String.format("%07d", 1);
+        }
+    }
+
     private XrTrip findTrip(String tripCode) {
         return tripRepository.findByTripCode(tripCode)
             .orElseThrow(() -> new RuntimeException("Trip not found: " + tripCode));
