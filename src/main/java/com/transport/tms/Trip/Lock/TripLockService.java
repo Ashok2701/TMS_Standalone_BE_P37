@@ -158,7 +158,7 @@ public class TripLockService {
     }
 
     // ═══════════════════════════════════════════════════════════
-    // XX10CPLANCHD
+    // XX10CPLANCHD — exact schema with correct field names
     // ═══════════════════════════════════════════════════════════
     @SuppressWarnings("unchecked")
     private void writePlanningDetails(XrTrip trip, String x3, String userCode) {
@@ -172,33 +172,149 @@ public class TripLockService {
                 objectMapper.getTypeFactory().constructCollectionType(List.class, Map.class));
         } catch (Exception e) { log.error("Cannot parse stops for {}: {}", trip.getTripCode(), e.getMessage()); return; }
 
+        LocalDateTime now = LocalDateTime.now();
+        String emptyStr   = "";
+        byte[] emptyUuid  = new byte[16];
+
         String sql = "INSERT INTO " + x3 + ".XX10CPLANCHD ("
-            + "XNUMPC_0,SDHNUM_0,XSEQ_0,XTYPE_0,"
-            + "XBPCODE_0,XADRESCODE_0,XCITY_0,"
-            + "XARRDATE_0,XARRTIME_0,XDEPDATE_0,XDEPTIME_0,"
-            + "XSRVTIME_0,XWAITTIME_0,"
-            + "XDISTFRMPREV_0,XTRVTIMEFRMPREV_0,"
-            + "XNETWEIGHT_0,XVOLUME_0,XUSRCODE_0,XCREDATTIM_0"
-            + ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+            // Identity / keys
+            + "UPDTICK_0, XNUMPC_0, XLINPC_0, SDHNUM_0, XPICK_SDH_0, XDTYPE_0,"
+            // Audit
+            + "CREDAT_0, CREUSR_0, UPDUSR_0, UPDDAT_0, CREDATTIM_0, UPDDATTIM_0,"
+            // Sequence + distances
+            + "SEQUENCE_0, FROMPREVDIST_0, FROMPREVTRA_0,"
+            // Planned arrival
+            + "ARRIVEDATE_0, AARRIVEDATE_0, ARRIVETIME_0, AARRIVETIME_0,"
+            // Planned departure
+            + "DEPARTDATE_0, ADEPARTDATE_0, DEPARTTIME_0, ADEPARTTIME_0,"
+            // UTC times (same as planned)
+            + "ARRIVEDATEUT_0, ARRIVETIMEUT_0, DEPARTDATEU_0, DEPARTTIMEU_0,"
+            // RAINONAFF (5 slots)
+            + "RAINONAFF_0, RAINONAFF_1, RAINONAFF_2, RAINONAFF_3, RAINONAFF_4,"
+            // Flags
+            + "OPTISTA_0, XLOADED_0, XACTETA_0, XACTETD_0,"
+            + "XSMSFLG_0, XSDHSKIP_0, XDEPFLG_0, XDLV_STATUS_0,"
+            // Measurements
+            + "XMS_0, XVOL_0, SERVICETIME_0, XCALCDIS_0, XWAITTIME_0, XMAXSTAHT_0,"
+            + "SWAITTIME_0, SERVICETIM_0,"
+            // Doc info
+            + "XDOCTYP_0, XPICKUP_DROP_0, XSEALNUM_0, XSKIPRES_0, XACTSEQ_0,"
+            // Return times (empty)
+            + "RDEPARTDATE_0, RDEPARTTIME_0, RARRIVEDATE_0, RARRIVETIME_0,"
+            // Confirm times (empty)
+            + "XCNFARRDATE_0, XCNFARRTIME_0, XCNFDEPDATE_0, XCNFDEPTIME_0,"
+            // Misc
+            + "XDOCSTA_0, XACTDISTMTS_0, XDOCSITE_0, XBREAKTYP_0, XLOADBAY_0,"
+            + "XSPECIFICRES_0, AUUID_0"
+            + ") VALUES ("
+            + "0,?,?,?,?,1,"           // UPDTICK_0=0, XNUMPC_0, XLINPC_0, SDHNUM_0, XPICK_SDH_0=empty, XDTYPE_0=1
+            + "?,?,?,?,?,?,"           // CREDAT_0, CREUSR_0, UPDUSR_0, UPDDAT_0, CREDATTIM_0, UPDDATTIM_0
+            + "?,?,?,"                 // SEQUENCE_0, FROMPREVDIST_0, FROMPREVTRA_0
+            + "?,?,?,?,"               // ARRIVEDATE_0, AARRIVEDATE_0, ARRIVETIME_0, AARRIVETIME_0
+            + "?,?,?,?,"               // DEPARTDATE_0, ADEPARTDATE_0, DEPARTTIME_0, ADEPARTTIME_0
+            + "?,?,?,?,"               // ARRIVEDATEUT_0, ARRIVETIMEUT_0, DEPARTDATEU_0, DEPARTTIMEU_0
+            + "?,?,?,?,?,"             // RAINONAFF 0-4
+            + "1,0,?,?,0,0,0,1,"       // OPTISTA_0=1, XLOADED_0=0, XACTETA_0, XACTETD_0, flags, XDLV_STATUS_0=1
+            + "?,?,?,0,?,0,0,?,"       // XMS_0, XVOL_0, SERVICETIME_0, XCALCDIS_0=0, XWAITTIME_0, SWAITTIME_0=0, SERVICETIM_0
+            + "1,?,?,?,0,"             // XDOCTYP_0=1, XPICKUP_DROP_0, XSEALNUM_0, XSKIPRES_0, XACTSEQ_0=0
+            + "?,?,?,?,"               // RDEPARTDATE_0, RDEPARTTIME_0, RARRIVEDATE_0, RARRIVETIME_0
+            + "?,?,?,?,"               // XCNFARRDATE_0, XCNFARRTIME_0, XCNFDEPDATE_0, XCNFDEPTIME_0
+            + "0,0,?,0,0,?,?"          // XDOCSTA_0=0, XACTDISTMTS_0=0, XDOCSITE_0, XBREAKTYP_0=0, XLOADBAY_0=0, XSPECIFICRES_0, AUUID_0
+            + ")";
 
         int seq = 1;
         for (Map<String, Object> s : stops) {
             try {
+                String docNum    = getString(s, "txn", "docNum", "id");
+                String arrDate   = getString(s, "arrivalDate");
+                String arrTime   = getString(s, "arrivalTime");
+                String depDate   = getString(s, "departureDate");
+                String depTime   = getString(s, "departureTime");
+                String srvTime   = getString(s, "serviceTime");
+                String waitTime  = getString(s, "waitingTime");
+                String prevDist  = getString(s, "fromPrevDistance");
+                String prevTravel= getString(s, "fromPrevTravelTime");
+                String stopType  = getString(s, "type", "stopType");
+                String site      = trip.getSite();
+
+                // Parse dates
+                LocalDateTime arrDT  = parseDateTime(arrDate, arrTime);
+                LocalDateTime depDT  = parseDateTime(depDate, depTime);
+
+                // numeric values
+                double prevDistNum   = parseDouble(prevDist);
+                double prevTravelNum = parseDouble(prevTravel);
+                double waitNum       = parseDouble(waitTime);
+
+                // DROP=1, PICKUP=2
+                int pickupDrop = "PICKUP".equals(stopType) ? 2 : 1;
+
                 sqlServerJdbc.update(sql,
-                    trip.getTripCode(), getString(s,"txn","docNum","id"), seq++,
-                    getString(s,"type","stopType"),
-                    getString(s,"bpcode","bpCode"), getString(s,"addressCode","adrescode"),
-                    getString(s,"city"),
-                    getString(s,"arrivalDate"), getString(s,"arrivalTime"),
-                    getString(s,"departureDate"), getString(s,"departureTime"),
-                    getString(s,"serviceTime"), getString(s,"waitingTime"),
-                    getString(s,"fromPrevDistance"), getString(s,"fromPrevTravelTime"),
-                    dbl(s,"netweight","netWeight"), dbl(s,"vol","volume"),
-                    userCode, LocalDateTime.now()
+                    // Keys
+                    trip.getTripCode(),          // XNUMPC_0
+                    seq * 1000,                  // XLINPC_0 = line * 1000
+                    docNum != null ? docNum : emptyStr, // SDHNUM_0
+                    emptyStr,                    // XPICK_SDH_0
+                    // Audit
+                    now, userCode, userCode, now, now, now,
+                    // Sequence + distances
+                    seq,                         // SEQUENCE_0
+                    prevDistNum,                 // FROMPREVDIST_0
+                    prevTravelNum,               // FROMPREVTRA_0
+                    // Planned arrival
+                    arrDT, arrDT,                // ARRIVEDATE_0, AARRIVEDATE_0
+                    arrTime != null ? arrTime : emptyStr,  // ARRIVETIME_0
+                    arrTime != null ? arrTime : emptyStr,  // AARRIVETIME_0
+                    // Planned departure
+                    depDT, depDT,                // DEPARTDATE_0, ADEPARTDATE_0
+                    depTime != null ? depTime : emptyStr,  // DEPARTTIME_0
+                    depTime != null ? depTime : emptyStr,  // ADEPARTTIME_0
+                    // UTC (same as planned)
+                    arrDT, arrTime != null ? arrTime : emptyStr,
+                    depDT, depTime != null ? depTime : emptyStr,
+                    // RAINONAFF 0-4
+                    emptyStr, emptyStr, emptyStr, emptyStr, emptyStr,
+                    // XACTETA_0, XACTETD_0
+                    arrTime != null ? arrTime : emptyStr,
+                    depTime != null ? depTime : emptyStr,
+                    // XMS_0, XVOL_0, SERVICETIME_0, XWAITTIME_0, SERVICETIM_0
+                    emptyStr, emptyStr,
+                    srvTime != null ? srvTime : emptyStr,
+                    waitNum,
+                    srvTime != null ? srvTime : emptyStr,
+                    // XPICKUP_DROP_0, XSEALNUM_0, XSKIPRES_0
+                    pickupDrop, emptyStr, emptyStr,
+                    // RDEPARTDATE_0, RDEPARTTIME_0, RARRIVEDATE_0, RARRIVETIME_0
+                    now, emptyStr, now, emptyStr,
+                    // XCNFARRDATE_0, XCNFARRTIME_0, XCNFDEPDATE_0, XCNFDEPTIME_0
+                    now, emptyStr, now, emptyStr,
+                    // XDOCSITE_0, XSPECIFICRES_0, AUUID_0
+                    site != null ? site : emptyStr,
+                    emptyStr,
+                    emptyUuid
                 );
-            } catch (Exception e) { log.error("Stop {} for {}: {}", seq, trip.getTripCode(), e.getMessage()); }
+                seq++;
+            } catch (Exception e) {
+                log.error("XX10CPLANCHD stop {} for {}: {}", seq, trip.getTripCode(), e.getMessage());
+            }
         }
-        log.info("XX10CPLANCHD: {} rows for {}", stops.size(), trip.getTripCode());
+        log.info("XX10CPLANCHD: {} rows written for {}", stops.size(), trip.getTripCode());
+    }
+
+    private LocalDateTime parseDateTime(String date, String time) {
+        try {
+            if (date == null || date.isBlank()) return LocalDateTime.now();
+            String d = date.trim();
+            String t = (time != null && !time.isBlank()) ? time.trim().substring(0, 5) : "00:00";
+            return java.time.LocalDateTime.parse(d + "T" + t + ":00");
+        } catch (Exception e) {
+            return LocalDateTime.now();
+        }
+    }
+
+    private double parseDouble(String val) {
+        try { return val != null ? Double.parseDouble(val) : 0.0; }
+        catch (Exception e) { return 0.0; }
     }
 
     // ═══════════════════════════════════════════════════════════
