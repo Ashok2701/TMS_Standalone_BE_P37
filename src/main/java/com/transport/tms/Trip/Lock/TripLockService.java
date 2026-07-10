@@ -136,6 +136,7 @@ public class TripLockService {
         String hhmm           = now.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"));
         String emptyStr       = "";
         byte[] emptyUuid      = new byte[16];
+        String usr5           = userCode != null && userCode.length() > 5 ? userCode.substring(0,5) : (userCode != null ? userCode : "SYS");
         String veh            = trip.getVehicleCode() != null ? trip.getVehicleCode() : emptyStr;
         String site           = trip.getSite()        != null ? trip.getSite()        : emptyStr;
         String driverId       = trip.getDriverId()    != null ? trip.getDriverId()    : emptyStr;
@@ -198,7 +199,7 @@ public class TripLockService {
         params.add(veh);                  // XCODEYVE_0
         params.add(startTime);            // HEUDEP_0
         // Audit
-        params.add(now); params.add(userCode); params.add(userCode); params.add(now);
+        params.add(now); params.add(usr5); params.add(usr5); params.add(now);
         // Status/IDs
         params.add(1);                    // OPTIMSTA_0 = 1
         params.add(site);                 // FCY_0
@@ -223,7 +224,7 @@ public class TripLockService {
         params.add(driverId);             // DRIVERID_0
         params.add(0);                    // XROUTNBR_0
         // LASTUPD
-        params.add(now); params.add(hhmm); params.add(userCode);
+        params.add(now); params.add(hhmm); params.add(usr5);
         // Status strings
         params.add(emptyStr); params.add(emptyStr); params.add(emptyStr);
         params.add(emptyStr); params.add(emptyStr); params.add(emptyStr);
@@ -308,6 +309,7 @@ public class TripLockService {
         LocalDateTime now = LocalDateTime.now();
         String emptyStr   = "";
         byte[] emptyUuid  = new byte[16];
+        String usr5       = userCode != null && userCode.length() > 5 ? userCode.substring(0,5) : (userCode != null ? userCode : "SYS");
 
         String sql = "INSERT INTO " + x3 + ".XX10CPLANCHD ("
             // Identity / keys
@@ -389,7 +391,7 @@ public class TripLockService {
                     docNum != null ? docNum : emptyStr, // SDHNUM_0
                     emptyStr,                    // XPICK_SDH_0
                     // Audit
-                    now, userCode, userCode, now, now, now,
+                    now, usr5, usr5, now, now, now,
                     // Sequence + distances
                     seq,                         // SEQUENCE_0
                     prevDistNum,                 // FROMPREVDIST_0
@@ -461,6 +463,7 @@ public class TripLockService {
 
         LocalDateTime now    = LocalDateTime.now();
         String e             = "";                     // empty string
+        String usr5          = userCode != null && userCode.length() > 5 ? userCode.substring(0,5) : (userCode != null ? userCode : "SYS");
         byte[] emptyUuid     = new byte[16];
         String veh           = trip.getVehicleCode() != null ? trip.getVehicleCode() : e;
         String site          = trip.getSite()        != null ? trip.getSite()        : e;
@@ -508,9 +511,9 @@ public class TripLockService {
         p.add(0);           // EXPNUM_0
         p.add(0);           // IMPNUMLIG_0
         p.add(now);         // CREDAT_0
-        p.add(userCode);    // CREUSR_0
+        p.add(usr5);        // CREUSR_0
         p.add(now);         // UPDDAT_0
-        p.add(userCode);    // UPDUSR_0
+        p.add(usr5);        // UPDUSR_0
         p.add(now);         // CREDATTIM_0
         p.add(now);         // UPDDATTIM_0
         p.add(emptyUuid);   // AUUID_0
@@ -529,7 +532,7 @@ public class TripLockService {
         p.add(e);           // XSALEMEN_0
         p.add(e);           // XOPERATOR_0
         p.add(e);           // XTECHN_0
-        p.add(driverId);    // XAPPUSR_0 — driver id
+        p.add(driverId.length() > 15 ? driverId.substring(0,15) : driverId);    // XAPPUSR_0
         p.add(lvsNum);      // XVCRNUM_0 — LVS number
         p.add(0);           // XRETURNFLG_0
         p.add(0);           // XACTFLG_0
