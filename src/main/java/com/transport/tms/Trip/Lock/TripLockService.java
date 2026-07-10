@@ -153,7 +153,7 @@ public class TripLockService {
 
         // Build column list
         StringBuilder cols = new StringBuilder(
-            "XNUMPC_0,BPTNUM_0,CODEYVE_0,XCODEYVE_0,HEUDEP_0,"
+            "UPDTICK_0,XNUMPC_0,BPTNUM_0,CODEYVE_0,XCODEYVE_0,HEUDEP_0,"
             + "CREDAT_0,CREUSR_0,UPDUSR_0,UPDDAT_0,"
             + "OPTIMSTA_0,FCY_0,XVRY_0,JOBID_0,"
             + "TOTDISTANCE_0,TOTTIME_0,XNUMTV_0,"
@@ -191,6 +191,7 @@ public class TripLockService {
         // Build params list
         java.util.List<Object> params = new java.util.ArrayList<>();
         // Core fields
+        params.add(0);                    // UPDTICK_0
         params.add(trip.getTripCode());   // XNUMPC_0
         params.add(emptyStr);             // BPTNUM_0
         params.add(veh);                  // CODEYVE_0
@@ -450,7 +451,7 @@ public class TripLockService {
     }
 
     // ═══════════════════════════════════════════════════════════
-    // XX10CLODSTOH
+    // XX10CLODSTOH — exact schema
     // ═══════════════════════════════════════════════════════════
     private void writeLVSHeader(XrTrip trip, String x3, String userCode) {
         Integer cnt = sqlServerJdbc.queryForObject(
@@ -458,22 +459,177 @@ public class TripLockService {
             Integer.class, trip.getTripCode());
         if (cnt != null && cnt > 0) { log.info("LVS already exists for {}", trip.getTripCode()); return; }
 
-        sqlServerJdbc.update(
-            "INSERT INTO " + x3 + ".XX10CLODSTOH ("
-            + "XVRSEL_0,XFCY_0,XDATLIV_0,XVEHCODE_0,XDRIVERID_0,"
-            + "XHEUDEP_0,XHEUARR_0,XTOTDIST_0,XTOTTIME_0,XTRVTIME_0,"
-            + "XDROPS_0,XPICKUPS_0,XNOPACK_0,XTOTWEIGHT_0,XTOTVOL_0,"
-            + "XLOADFLG_0,XDEPSIT_0,XARRSIT_0,XUSRCODE_0,XCREDATTIM_0"
-            + ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            trip.getTripCode(), trip.getSite(), trip.getDocDate(),
-            trip.getVehicleCode(), trip.getDriverId(),
-            trip.getStartTime(), trip.getEndTime(),
-            trip.getTotalDistance(), trip.getTotalTime(), trip.getTravelTime(),
-            trip.getDrops(), trip.getPickups(), trip.getNoOfPackages(),
-            trip.getTotalWeight(), trip.getTotalVolume(),
-            1, trip.getDepSite(), trip.getArrSite(), userCode, LocalDateTime.now()
-        );
-        log.info("XX10CLODSTOH written for {}", trip.getTripCode());
+        LocalDateTime now    = LocalDateTime.now();
+        String e             = "";                     // empty string
+        byte[] emptyUuid     = new byte[16];
+        String veh           = trip.getVehicleCode() != null ? trip.getVehicleCode() : e;
+        String site          = trip.getSite()        != null ? trip.getSite()        : e;
+        String driverId      = trip.getDriverId()    != null ? trip.getDriverId()    : e;
+        String startTime     = trip.getStartTime()   != null ? trip.getStartTime()   : e;
+        String endTime       = trip.getEndTime()     != null ? trip.getEndTime()     : e;
+        String arrSite       = trip.getArrSite()     != null ? trip.getArrSite()     : e;
+        double capWeight     = parseDoubleSafe(trip.getTotalWeight());
+        java.time.LocalDate  doc   = trip.getDocDate() != null ? trip.getDocDate() : java.time.LocalDate.now();
+        LocalDateTime docDt  = doc.atStartOfDay();
+
+        // Generate LVS number: LVS-{tripCode}
+        String lvsNum = "LVS-" + trip.getTripCode();
+
+        java.util.List<Object> p = new java.util.ArrayList<>();
+        p.add(0);           // UPDTICK_0
+        p.add(lvsNum);      // VCRNUM_0  — generated LVS number
+        p.add(0);           // BETFCYCOD_0 tinyint
+        p.add(site);        // STOFCY_0
+        p.add(e);           // FCYDES_0
+        p.add(site);        // PURFCY_0
+        p.add(site);        // SALFCY_0
+        p.add(e);           // FCYADD_0
+        p.add(e);           // BPSNUM_0
+        p.add(e);           // BPSADD_0
+        p.add(e);           // SCOLOC_0
+        p.add(e);           // PJT_0
+        p.add(e);           // BPCNUM_0
+        p.add(e);           // CUR_0
+        p.add(0);           // BETCPY_0
+        p.add(0);           // INVSGH_0
+        p.add(0);           // INVFLG_0
+        p.add(e);           // SIHNUM_0
+        p.add(docDt);       // IPTDAT_0 — trip date
+        p.add(e);           // VCRDES_0
+        p.add(e);           // TRSFAM_0
+        p.add(0);           // TRSTYP_0
+        p.add(e);           // TRSCOD_0
+        p.add(e);           // ENTCOD_0
+        // DIE_0..19
+        for (int i=0;i<=19;i++) p.add(e);
+        // CCE_0..19
+        for (int i=0;i<=19;i++) p.add(e);
+        p.add(e);           // WRHE_0
+        p.add(0);           // EXPNUM_0
+        p.add(0);           // IMPNUMLIG_0
+        p.add(now);         // CREDAT_0
+        p.add(userCode);    // CREUSR_0
+        p.add(now);         // UPDDAT_0
+        p.add(userCode);    // UPDUSR_0
+        p.add(now);         // CREDATTIM_0
+        p.add(now);         // UPDDATTIM_0
+        p.add(emptyUuid);   // AUUID_0
+        p.add(0);           // CFMFLG_0
+        p.add(e);           // SGHTYP_0
+        p.add(e);           // TMPSGHNUM_0
+        p.add(e);           // MANDOC_0
+        p.add(e);           // ATDTCOD_0
+        p.add(docDt);       // DPEDAT_0 — departure date
+        p.add(startTime);   // ETD_0 — start time
+        p.add(docDt);       // ARVDAT_0 — arrival date
+        p.add(endTime);     // ETA_0 — end time
+        p.add(veh);         // LICPLATE_0 — vehicle code
+        p.add(veh);         // TRLLICPLATE_0 — vehicle code
+        p.add(driverId);    // DRIVERID_0
+        p.add(e);           // XSALEMEN_0
+        p.add(e);           // XOPERATOR_0
+        p.add(e);           // XTECHN_0
+        p.add(driverId);    // XAPPUSR_0 — driver id
+        p.add(lvsNum);      // XVCRNUM_0 — LVS number
+        p.add(0);           // XRETURNFLG_0
+        p.add(0);           // XACTFLG_0
+        p.add(0);           // XBUSTYP1_0
+        p.add(0);           // XBUSTYP2_0
+        p.add(trip.getTripCode()); // XVRSEL_0 — tripCode
+        p.add(e);           // XLOADREF_0
+        p.add(veh);         // CODEYVE_0 — vehicle code
+        p.add(1);           // XVALFLG_0
+        p.add(e);           // LOCSEL_0
+        p.add(0);           // XROUTNBR_0 — trip seq
+        p.add(e);           // XTEXTNUM_0
+        p.add(0.0);         // XTOTNONSTK_0
+        p.add(veh);         // XCODEYVE_0 — vehicle code
+        p.add(1);           // XLOADFLG_0 = 1 Generated
+        p.add(0);           // X10CHKIN_0
+        p.add(docDt);       // XXIPTDAT_0 — trip date
+        p.add(0);           // XSCHREALC_0
+        p.add(capWeight);   // XCAPACITIES_0 — trip weight
+        p.add(0.0);         // XVEHVOL_0
+        p.add(0.0);         // XTOTSHESTK_0
+        p.add(e);           // XSEALNUMH_0
+        p.add(0);           // XUNLOADFLG_0
+        p.add(0);           // XSTARTODMTR_0
+        p.add(0);           // XENDODMTR_0
+        p.add(now);         // XCHKINDAT_0
+        p.add(e);           // XCHKINTIM_0
+        p.add(now);         // XCHKOUDAT_0
+        p.add(e);           // XCHKOUTIM_0
+        p.add(e); p.add(e); p.add(e); p.add(e); p.add(e); // XPMASS,XPVOL,XMASS,XVMASS,XLMASS
+        p.add(e); p.add(e); p.add(e);  // XVOLCAM,XVEHV,XMPVOL
+        p.add(now);         // XUNLOADDATE_0
+        p.add(e);           // XUNLOADEDBY_0
+        p.add(e);           // XUNLOADTIME_0
+        p.add(e); p.add(e); p.add(e); // TRAILER_0, TRAILER_1, TRAILER2_0
+        p.add(docDt);       // XVRDATE_0 — trip date
+        p.add(e);           // XSOURCELOC_0
+        p.add(0); p.add(0); // XLOADBAYD_0, XLOADBAYR_0
+        p.add(e);           // XDEVICEID_0
+        p.add(e);           // XOLDCODEYVE_0
+        p.add(arrSite);     // XDESFCY_0
+        p.add(0);           // XBUSTYP3_0
+        p.add(e);           // XBPTNUM_0 — carrier
+        p.add(veh);         // XECODEYVE_0 — vehicle code
+        p.add(driverId);    // XEDRIVERID_0 — driver code
+        p.add(e);           // XEREGSTR_0
+        p.add(e);           // XETRAILER_0
+        p.add(e);           // XETREGSTR_0
+        p.add(e); p.add(e); // XLOG_0, XPDLOG_0
+        p.add(0);           // XSTOVAL_0
+        p.add(e);           // XMOB_0
+        p.add(e);           // XWEB_0
+        p.add(0);           // XFORSEQ_0
+        p.add(e); p.add(e); p.add(e); // XLOADUSR_0, XLOADNAM_0, XLOADEML_0
+        p.add(e);           // XDRN_0
+        p.add(0); p.add(0); // XPODSUB_0, XPODSTATUS_0
+        p.add(0); p.add(0); // XLODAPPSTA_0, XROUTSTAT_0
+        p.add(0);           // XTRIP_0 — trip seq
+        p.add(e);           // MDL_0
+        p.add(0);           // XMLDUSER_0
+        p.add(e);           // XPOHNUM_0
+        p.add(0);           // XSTATUS_0
+        p.add(0);           // XALLFLG_0
+        p.add(e);           // XROUTERSA_0
+        p.add(e);           // XNOTE1_0
+
+        String cols =
+            "UPDTICK_0,VCRNUM_0,BETFCYCOD_0,STOFCY_0,FCYDES_0,PURFCY_0,SALFCY_0,FCYADD_0,"
+            + "BPSNUM_0,BPSADD_0,SCOLOC_0,PJT_0,BPCNUM_0,CUR_0,BETCPY_0,INVSGH_0,INVFLG_0,"
+            + "SIHNUM_0,IPTDAT_0,VCRDES_0,TRSFAM_0,TRSTYP_0,TRSCOD_0,ENTCOD_0,"
+            + "DIE_0,DIE_1,DIE_2,DIE_3,DIE_4,DIE_5,DIE_6,DIE_7,DIE_8,DIE_9,"
+            + "DIE_10,DIE_11,DIE_12,DIE_13,DIE_14,DIE_15,DIE_16,DIE_17,DIE_18,DIE_19,"
+            + "CCE_0,CCE_1,CCE_2,CCE_3,CCE_4,CCE_5,CCE_6,CCE_7,CCE_8,CCE_9,"
+            + "CCE_10,CCE_11,CCE_12,CCE_13,CCE_14,CCE_15,CCE_16,CCE_17,CCE_18,CCE_19,"
+            + "WRHE_0,EXPNUM_0,IMPNUMLIG_0,"
+            + "CREDAT_0,CREUSR_0,UPDDAT_0,UPDUSR_0,CREDATTIM_0,UPDDATTIM_0,AUUID_0,"
+            + "CFMFLG_0,SGHTYP_0,TMPSGHNUM_0,MANDOC_0,ATDTCOD_0,"
+            + "DPEDAT_0,ETD_0,ARVDAT_0,ETA_0,LICPLATE_0,TRLLICPLATE_0,"
+            + "DRIVERID_0,XSALEMEN_0,XOPERATOR_0,XTECHN_0,XAPPUSR_0,"
+            + "XVCRNUM_0,XRETURNFLG_0,XACTFLG_0,XBUSTYP1_0,XBUSTYP2_0,"
+            + "XVRSEL_0,XLOADREF_0,CODEYVE_0,XVALFLG_0,LOCSEL_0,"
+            + "XROUTNBR_0,XTEXTNUM_0,XTOTNONSTK_0,XCODEYVE_0,XLOADFLG_0,"
+            + "X10CHKIN_0,XXIPTDAT_0,XSCHREALC_0,XCAPACITIES_0,XVEHVOL_0,"
+            + "XTOTSHESTK_0,XSEALNUMH_0,XUNLOADFLG_0,XSTARTODMTR_0,XENDODMTR_0,"
+            + "XCHKINDAT_0,XCHKINTIM_0,XCHKOUDAT_0,XCHKOUTIM_0,"
+            + "XPMASS_0,XPVOL_0,XMASS_0,XVMASS_0,XLMASS_0,XVOLCAM_0,XVEHV_0,XMPVOL_0,"
+            + "XUNLOADDATE_0,XUNLOADEDBY_0,XUNLOADTIME_0,"
+            + "TRAILER_0,TRAILER_1,TRAILER2_0,XVRDATE_0,XSOURCELOC_0,"
+            + "XLOADBAYD_0,XLOADBAYR_0,XDEVICEID_0,XOLDCODEYVE_0,XDESFCY_0,"
+            + "XBUSTYP3_0,XBPTNUM_0,XECODEYVE_0,XEDRIVERID_0,XEREGSTR_0,"
+            + "XETRAILER_0,XETREGSTR_0,XLOG_0,XPDLOG_0,XSTOVAL_0,"
+            + "XMOB_0,XWEB_0,XFORSEQ_0,XLOADUSR_0,XLOADNAM_0,XLOADEML_0,"
+            + "XDRN_0,XPODSUB_0,XPODSTATUS_0,XLODAPPSTA_0,XROUTSTAT_0,"
+            + "XTRIP_0,MDL_0,XMLDUSER_0,XPOHNUM_0,XSTATUS_0,XALLFLG_0,XROUTERSA_0,XNOTE1_0";
+
+        String sql = "INSERT INTO " + x3 + ".XX10CLODSTOH (" + cols + ") VALUES ("
+            + String.join(",", java.util.Collections.nCopies(p.size(), "?")) + ")";
+
+        sqlServerJdbc.update(sql, p.toArray());
+        log.info("XX10CLODSTOH ({} fields) written for trip {}", p.size(), trip.getTripCode());
     }
 
     // ═══════════════════════════════════════════════════════════
