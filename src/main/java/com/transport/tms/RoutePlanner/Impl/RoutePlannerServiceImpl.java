@@ -58,14 +58,19 @@ public class RoutePlannerServiceImpl implements RoutePlannerService {
     //  1. Validate site (Postgres)
     //  2. Vehicles (Postgres)
     //  3. Drivers  (Postgres)
-    //  4. Drops    (SQL Server XTMSDLVY_TMS — x fields only)
-    //  5. Pickups  (SQL Server XTMSPICK_TMS — x fields only)
-    //  6. Enrich drops  (Postgres vw_rp_stop_enrich, doc_type='DLV')
+    //  4. Deliveries (SQL Server XTMSDLVY_TMS — x fields only)
+    //  5. Pick tickets (SQL Server XTMSPICK_TMS — x fields only)
+    //  6. Enrich deliveries   (Postgres vw_rp_stop_enrich, doc_type='DLV')
     //     → in-memory join by BPCODE + ADRESCODE
     //     → fills lat/lon, service_time, waiting_time,
     //              route_tag, route_color, time windows
-    //  7. Enrich pickups (same, doc_type='PICK')
-    //  8. Build combined RoutePlannerResponseDTO
+    //  7. Enrich pick tickets (same, doc_type='PICK')
+    //  8. Business rule: "Drops" = deliveries + pick tickets
+    //     (both are things dropped off at the customer location).
+    //     "Pickups" = collecting from a customer/supplier location —
+    //     not currently sourced from X3, so this bucket is empty
+    //     until that data source is identified/added.
+    //  9. Build combined RoutePlannerResponseDTO
     // ─────────────────────────────────────────────────────────
     @Override
     public RoutePlannerResponseDTO loadPlannerData(String siteCode, LocalDate planDate) {
@@ -85,27 +90,43 @@ public class RoutePlannerServiceImpl implements RoutePlannerService {
         List<Driver> drivers = driverRepository.findAllActiveDrivers();
         log.info("RoutePlanner: {} drivers", drivers.size());
 
-        // ── 4. Drops from SQL Server (XTMSDLVY_TMS) ──────────
-        List<RoutePlannerStopDTO> drops = fetchX3Stops(
+        // ── 4. Deliveries from SQL Server (XTMSDLVY_TMS) ──────
+        List<RoutePlannerStopDTO> deliveries = fetchX3Stops(
                 () -> x3Repository.findDropsByDateAndSite(siteCode, planDate),
-                "drops");
+                "deliveries");
 
-        // ── 5. Pickups from SQL Server (XTMSPICK_TMS) ─────────
-        List<RoutePlannerStopDTO> pickups = fetchX3Stops(
+        // ── 5. Pick tickets from SQL Server (XTMSPICK_TMS) ────
+        // NOTE: these are picking/fulfillment documents for outbound
+        // deliveries — they are dropped at the customer, same as
+        // deliveries. They are NOT customer/supplier pickups.
+        List<RoutePlannerStopDTO> pickTickets = fetchX3Stops(
                 () -> x3Repository.findPickupsByDateAndSite(siteCode, planDate),
-                "pickups");
+                "pick-tickets");
 
-        // ── 6. Enrich drops with Postgres p-fields ────────────
-        enrichStops(drops, "DLV");
+        // ── 6. Enrich deliveries with Postgres p-fields ───────
+        enrichStops(deliveries, "DLV");
 
-        // ── 7. Enrich pickups with Postgres p-fields ──────────
-        enrichStops(pickups, "PICK");
+        // ── 7. Enrich pick tickets with Postgres p-fields ─────
+        enrichStops(pickTickets, "PICK");
 
-        // ── 8. Load product lines for all stops (batch) ───────
-        loadProducts(drops,   "DROP");
-        loadProducts(pickups, "PICKUP");
+        // ── 8. Load product lines per underlying source table ─
+        // (this is keyed to the X3 source table, not the business
+        // bucket — deliveries and pick tickets have different
+        // product-line tables regardless of both being "drops")
+        loadProducts(deliveries,   "DROP");
+        loadProducts(pickTickets, "PICKUP");
 
-        // ── 8. Build response ─────────────────────────────────
+        // ── 9. Business bucket: Drops = deliveries + pick tickets ──
+        List<RoutePlannerStopDTO> drops = new java.util.ArrayList<>(
+                deliveries.size() + pickTickets.size());
+        drops.addAll(deliveries);
+        drops.addAll(pickTickets);
+
+        // True "pickups" (collect from customer/supplier location) —
+        // no X3 data source wired up for this yet.
+        List<RoutePlannerStopDTO> pickups = List.of();
+
+        // ── 10. Build response ─────────────────────────────────
         RoutePlannerResponseDTO response = new RoutePlannerResponseDTO();
         response.setSiteCode(siteCode);
         response.setSiteName(site.getSiteName());
@@ -120,8 +141,8 @@ public class RoutePlannerServiceImpl implements RoutePlannerService {
         response.setDropCount(drops.size());
         response.setPickupCount(pickups.size());
 
-        log.info("RoutePlanner: response built — {} vehicles, {} drivers, {} drops, {} pickups",
-                vehicles.size(), drivers.size(), drops.size(), pickups.size());
+        log.info("RoutePlanner: response built — {} vehicles, {} drivers, {} drops ({} deliveries + {} pick tickets), {} pickups",
+                vehicles.size(), drivers.size(), drops.size(), deliveries.size(), pickTickets.size(), pickups.size());
 
         return response;
     }

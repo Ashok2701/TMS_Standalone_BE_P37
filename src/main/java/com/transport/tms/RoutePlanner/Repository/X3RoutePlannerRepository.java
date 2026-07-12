@@ -49,7 +49,14 @@ public class X3RoutePlannerRepository {
         dto.setDocNum(rs.getString("DOCNUM"));
         dto.setDocType(rs.getString("DOCTYPE"));
         dto.setMovType(rs.getString("MOVTYPE"));
-        dto.setStopType("DLV".equals(rs.getString("DOCTYPE")) ? "DROP" : "PICKUP");
+        // Business rule: "Drops" = anything left at the customer location.
+        // Both delivery docs (DLV) and pick-ticket docs (PICK) are drops —
+        // a pick ticket is X3's picking/fulfillment document for an outbound
+        // delivery, not a customer/supplier collection. True "pickups"
+        // (collecting from a customer or supplier location) are a different
+        // concept and are not sourced from either XTMSDLVY_TMS or
+        // XTMSPICK_TMS, so both doc types map to DROP here.
+        dto.setStopType("DROP");
         dto.setDocDate(toLocal(rs.getDate("DOCDATE")));
         dto.setOriginalDeliveryDate(toLocal(rs.getDate("OGLDLVDATE")));
         dto.setCompanyCode(rs.getString("CPYCODE"));
