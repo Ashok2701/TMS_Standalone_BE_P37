@@ -227,7 +227,63 @@ public class TripServiceImpl implements TripService {
     @Override
     public void deleteTrip(String tripCode) {
         XrTrip trip = findOrThrow(tripCode);
+
+        // Release the trip's stop documents back to the open pool in X3
+        // (mirrors CBTTL: on trip delete, SDELIVERY/STOPREH XDLV_STATUS_0
+        // is reset to 0 — "open"/unassigned — so the doc can be picked up
+        // by another trip). Previously this was skipped entirely, leaving
+        // deleted trips' docs stuck at XDLV_STATUS_0 = 1 (Allocated) with a
+        // dangling XNUMPC_0 reference to a trip code that no longer exists.
+        try { releaseStopDocuments(trip); }
+        catch (Exception e) { System.err.println("X3 stop document release failed: " + e.getMessage()); }
+
         repo.delete(trip);
+    }
+
+    // ── Release SDELIVERY + STOPREH on DELETE ──────────────────
+    // Resets: status = 0 (Open), clears trip code / driver / vehicle
+    @SuppressWarnings("unchecked")
+    private void releaseStopDocuments(XrTrip trip) {
+        if (trip.getStopObjectsJson() == null) return;
+        String x3 = schemas.getX3Schema();
+
+        try {
+            java.util.List<java.util.Map<String, Object>> stops = objectMapper.readValue(
+                trip.getStopObjectsJson(),
+                objectMapper.getTypeFactory().constructCollectionType(java.util.List.class, java.util.Map.class)
+            );
+
+            for (java.util.Map<String, Object> stop : stops) {
+                String docNum = getString(stop, "txn", "docNum", "id");
+                String type   = getString(stop, "type", "stopType");
+                if (docNum == null) continue;
+
+                if ("PICKUP".equals(type)) {
+                    sqlServerJdbc.update(
+                        "UPDATE " + x3 + ".STOPREH SET "
+                            + "XNUMPC_0 = '', "     // clear trip code
+                            + "XDRIVER_0 = '', "    // clear driver id
+                            + "CODEYVE_0 = '', "    // clear vehicle code
+                            + "XDLV_STATUS_0 = 0 "  // status = Open
+                            + "WHERE PRHNUM_0 = ?",
+                        docNum
+                    );
+                } else {
+                    sqlServerJdbc.update(
+                        "UPDATE " + x3 + ".SDELIVERY SET "
+                            + "XNUMPC_0 = '', "
+                            + "XDRIVER_0 = '', "
+                            + "CODEYVE_0 = '', "
+                            + "XDLV_STATUS_0 = 0 "
+                            + "WHERE SDHNUM_0 = ?",
+                        docNum
+                    );
+                }
+            }
+            System.out.println("X3 stop documents released for trip: " + trip.getTripCode());
+        } catch (Exception e) {
+            System.err.println("Warning: stop document release failed: " + e.getMessage());
+        }
     }
 
     // ── Helpers ───────────────────────────────────────────────
