@@ -230,7 +230,7 @@ public class TripServiceImpl implements TripService {
 
         // Release the trip's stop documents back to the open pool in X3
         // (mirrors CBTTL: on trip delete, SDELIVERY/STOPREH XDLV_STATUS_0
-        // is reset to 0 — "open"/unassigned — so the doc can be picked up
+        // is reset to 8 — released/unassigned — so the doc can be picked up
         // by another trip). Previously this was skipped entirely, leaving
         // deleted trips' docs stuck at XDLV_STATUS_0 = 1 (Allocated) with a
         // dangling XNUMPC_0 reference to a trip code that no longer exists.
@@ -241,7 +241,8 @@ public class TripServiceImpl implements TripService {
     }
 
     // ── Release SDELIVERY + STOPREH on DELETE ──────────────────
-    // Resets: status = 0 (Open), clears trip code / driver / vehicle
+    // Resets: status = 8, clears trip code / driver / vehicle /
+    //         departure date+time / arrival date+time
     @SuppressWarnings("unchecked")
     private void releaseStopDocuments(XrTrip trip) {
         if (trip.getStopObjectsJson() == null) return;
@@ -264,7 +265,11 @@ public class TripServiceImpl implements TripService {
                             + "XNUMPC_0 = '', "     // clear trip code
                             + "XDRIVER_0 = '', "    // clear driver id
                             + "CODEYVE_0 = '', "    // clear vehicle code
-                            + "XDLV_STATUS_0 = 0 "  // status = Open
+                            + "XDLV_STATUS_0 = 8, " // status = 8 (deleted/released)
+                            + "DPEDAT_0 = NULL, "   // clear departure date
+                            + "ETD_0 = '', "        // clear departure time
+                            + "ARVDAT_0 = NULL, "   // clear arrival date
+                            + "ETA_0 = '' "         // clear arrival time
                             + "WHERE PRHNUM_0 = ?",
                         docNum
                     );
@@ -274,7 +279,11 @@ public class TripServiceImpl implements TripService {
                             + "XNUMPC_0 = '', "
                             + "XDRIVER_0 = '', "
                             + "CODEYVE_0 = '', "
-                            + "XDLV_STATUS_0 = 0 "
+                            + "XDLV_STATUS_0 = 8, "
+                            + "DPEDAT_0 = NULL, "
+                            + "ETD_0 = '', "
+                            + "ARVDAT_0 = NULL, "
+                            + "ETA_0 = '' "
                             + "WHERE SDHNUM_0 = ?",
                         docNum
                     );
@@ -487,7 +496,14 @@ public class TripServiceImpl implements TripService {
     }
 
     // ── Update SDELIVERY + STOPREH on OPTIMISE ─────────────────
-    // Sets: arrival time, departure time per stop
+    // Sets: departure date+time, arrival date+time per stop
+    //
+    // BUG FIXED: this used to write "XDEPTIME_0"/"XARVTIME_0" — those
+    // aren't real columns on SDELIVERY/STOPREH. Per XTMSDLVY_TMS_view.sql
+    // and XTMSPICK_TMS_view.sql, the actual native X3 columns are:
+    //   DPEDAT_0 (departure date), ETD_0 (departure time),
+    //   ARVDAT_0 (arrival date),   ETA_0 (arrival time)
+    // and no date was ever being written at all before this fix.
     @SuppressWarnings("unchecked")
     private void updateStopTimes(XrTrip trip) {
         if (trip.getStopObjectsJson() == null) return;
@@ -500,33 +516,56 @@ public class TripServiceImpl implements TripService {
             );
 
             for (java.util.Map<String, Object> stop : stops) {
-                String docNum  = getString(stop, "txn", "docNum", "id");
-                String type    = getString(stop, "type", "stopType");
-                String depTime = getString(stop, "departureTime");
-                String arrTime = getString(stop, "arrivalTime");
+                String docNum   = getString(stop, "txn", "docNum", "id");
+                String type     = getString(stop, "type", "stopType");
+                String depDate  = getString(stop, "departureDate");
+                String depTime  = getString(stop, "departureTime");
+                String arrDate  = getString(stop, "arrivalDate");
+                String arrTime  = getString(stop, "arrivalTime");
                 if (docNum == null) continue;
+
+                java.sql.Date depDateSql = toSqlDate(depDate);
+                java.sql.Date arrDateSql = toSqlDate(arrDate);
 
                 if ("PICKUP".equals(type)) {
                     sqlServerJdbc.update(
                         "UPDATE " + x3 + ".STOPREH SET "
-                            + "XDEPTIME_0 = ?, "     // departure time HH:MM
-                            + "XARVTIME_0 = ? "      // arrival time HH:MM
+                            + "DPEDAT_0 = ?, "      // departure date
+                            + "ETD_0 = ?, "         // departure time HH:MM
+                            + "ARVDAT_0 = ?, "      // arrival date
+                            + "ETA_0 = ? "          // arrival time HH:MM
                             + "WHERE PRHNUM_0 = ?",
-                        depTime, arrTime, docNum
+                        depDateSql, depTime, arrDateSql, arrTime, docNum
                     );
                 } else {
                     sqlServerJdbc.update(
                         "UPDATE " + x3 + ".SDELIVERY SET "
-                            + "XDEPTIME_0 = ?, "     // departure time HH:MM
-                            + "XARVTIME_0 = ? "      // arrival time HH:MM
+                            + "DPEDAT_0 = ?, "
+                            + "ETD_0 = ?, "
+                            + "ARVDAT_0 = ?, "
+                            + "ETA_0 = ? "
                             + "WHERE SDHNUM_0 = ?",
-                        depTime, arrTime, docNum
+                        depDateSql, depTime, arrDateSql, arrTime, docNum
                     );
                 }
             }
             System.out.println("X3 stop times updated for trip: " + trip.getTripCode());
         } catch (Exception e) {
             System.err.println("Warning: stop time update failed: " + e.getMessage());
+        }
+    }
+
+    // Parses an ISO date string ("yyyy-MM-dd", optionally with a time
+    // component) into a java.sql.Date; returns null (not today's date)
+    // on blank/unparseable input so callers can safely write NULL.
+    private java.sql.Date toSqlDate(String date) {
+        if (date == null || date.isBlank()) return null;
+        try {
+            String d = date.trim();
+            if (d.length() > 10) d = d.substring(0, 10);
+            return java.sql.Date.valueOf(java.time.LocalDate.parse(d));
+        } catch (Exception e) {
+            return null;
         }
     }
 
