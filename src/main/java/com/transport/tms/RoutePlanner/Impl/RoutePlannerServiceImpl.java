@@ -15,6 +15,8 @@ import com.transport.tms.RoutePlanner.Repository.StopEnrichment;
 import com.transport.tms.RoutePlanner.Repository.X3RoutePlannerRepository;
 import com.transport.tms.RoutePlanner.Service.RoutePlannerService;
 import com.transport.tms.Sync.Site.Entity.XRSite;
+import com.transport.tms.Configuration.Document.Entity.DocumentConfig;
+import com.transport.tms.Configuration.Document.Repository.DocumentConfigRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -38,6 +40,7 @@ public class RoutePlannerServiceImpl implements RoutePlannerService {
     private final X3RoutePlannerRepository      x3Repository;
     private final StopEnrichmentRepository      enrichmentRepository;
     private final StopProductRepository          productRepository;
+    private final DocumentConfigRepository       documentConfigRepository;
 
     // ─────────────────────────────────────────────────────────
     // GET ALL TMS SITES
@@ -199,12 +202,15 @@ public class RoutePlannerServiceImpl implements RoutePlannerService {
                             (a, b) -> a   // keep first if duplicate
                     ));
 
-            // Step 4 — merge p-fields onto each stop DTO
+            // Step 4 — merge address-level p-fields onto each stop DTO
+            // (geo / service-time / time-windows — these DO depend on a
+            // matching xr_customer_address row, so they're correctly
+            // skipped when that lookup misses)
             stops.forEach(stop -> {
                 String key = stop.getBpCode() + "::" + stop.getAddressCode();
                 StopEnrichment e = enrichMap.get(key);
                 if (e == null) {
-                    log.debug("RoutePlanner: no enrichment for key={}", key);
+                    log.debug("RoutePlanner: no address enrichment for key={}", key);
                     return;
                 }
 
@@ -220,17 +226,62 @@ public class RoutePlannerServiceImpl implements RoutePlannerService {
                 stop.setAnyTimeWindow(e.getAnyTimeWindow());
                 stop.setFromTime(e.getFromTime());
                 stop.setToTime(e.getToTime());
-
-                // Route config (doc-type level)
-                stop.setRouteTag(e.getRouteTag());
-                stop.setRouteTagFra(e.getRouteTagFra());
-                stop.setRouteColor(e.getRouteColor());
             });
 
         } catch (Exception e) {
             log.error("RoutePlanner: Postgres enrichment failed for docType={} — {}",
                     docType, e.getMessage());
             // Stops still returned — just without p-fields (lat/lon will be null)
+        }
+
+        // Step 5 — document-config tag/color, independent of address match.
+        //
+        // BUG FIXED: route_tag/route_color used to come from the same
+        // customer+address join as lat/lon (via vw_rp_dlv_enrich's
+        // "LEFT JOIN (...) dc ON TRUE"). That join is a scalar constant —
+        // it doesn't actually depend on the customer/address row — but
+        // because it was bolted onto that FROM clause, ANY stop whose
+        // customer/address had no xr_customer_address match got NOTHING
+        // back at all, including tag/color, even though tag/color has
+        // nothing to do with the customer's address.
+        //
+        // Fix: look up xr_document_config directly by document_type,
+        // once per docType (not per stop), and apply it to every stop
+        // of that type regardless of whether address enrichment matched.
+        applyDocConfig(stops, docType);
+    }
+
+    // App-level docType ("DLV"/"PICK") → real X3 document_type code used
+    // in xr_document_config. Extend this mapping if more doc types are added
+    // (e.g. Sales Returns — see vw_rp_stop_enrich_view.sql notes on 'RTN').
+    private String resolveDocumentTypeCode(String docType) {
+        if ("PICK".equals(docType)) return "BDP";   // Pick Ticket
+        return "SDN";                                // Sales Delivery (default / "DLV")
+    }
+
+    private void applyDocConfig(List<RoutePlannerStopDTO> stops, String docType) {
+        String typeCode = resolveDocumentTypeCode(docType);
+        try {
+            DocumentConfig cfg = documentConfigRepository.findByDocumentType(typeCode)
+                    .stream()
+                    .filter(dc -> Boolean.TRUE.equals(dc.getActive()))
+                    .findFirst()
+                    .orElse(null);
+
+            if (cfg == null) {
+                log.warn("RoutePlanner: no active xr_document_config row for document_type={}", typeCode);
+                return;
+            }
+
+            stops.forEach(stop -> {
+                stop.setRouteTag(cfg.getDisplayNameEn());
+                stop.setRouteTagFra(cfg.getDisplayNameFr());
+                stop.setRouteColor(cfg.getColorCode());
+            });
+
+        } catch (Exception e) {
+            log.error("RoutePlanner: xr_document_config lookup failed for document_type={} — {}",
+                    typeCode, e.getMessage());
         }
     }
 
