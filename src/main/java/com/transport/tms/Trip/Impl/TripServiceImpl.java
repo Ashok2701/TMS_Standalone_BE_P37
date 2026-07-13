@@ -256,10 +256,9 @@ public class TripServiceImpl implements TripService {
 
             for (java.util.Map<String, Object> stop : stops) {
                 String docNum = getString(stop, "txn", "docNum", "id");
-                String type   = getString(stop, "type", "stopType");
                 if (docNum == null) continue;
 
-                if ("PICKUP".equals(type)) {
+                if (isPickTicket(stop)) {
                     sqlServerJdbc.update(
                         "UPDATE " + x3 + ".STOPREH SET "
                             + "XNUMPC_0 = '', "     // clear trip code
@@ -464,10 +463,9 @@ public class TripServiceImpl implements TripService {
 
             for (java.util.Map<String, Object> stop : stops) {
                 String docNum = getString(stop, "txn", "docNum", "id");
-                String type   = getString(stop, "type", "stopType");
                 if (docNum == null) continue;
 
-                if ("PICKUP".equals(type)) {
+                if (isPickTicket(stop)) {
                     sqlServerJdbc.update(
                         "UPDATE " + x3 + ".STOPREH SET "
                             + "XNUMPC_0 = ?, "       // trip code
@@ -517,7 +515,6 @@ public class TripServiceImpl implements TripService {
 
             for (java.util.Map<String, Object> stop : stops) {
                 String docNum   = getString(stop, "txn", "docNum", "id");
-                String type     = getString(stop, "type", "stopType");
                 String depDate  = getString(stop, "departureDate");
                 String depTime  = getString(stop, "departureTime");
                 String arrDate  = getString(stop, "arrivalDate");
@@ -527,7 +524,7 @@ public class TripServiceImpl implements TripService {
                 java.sql.Date depDateSql = toSqlDate(depDate);
                 java.sql.Date arrDateSql = toSqlDate(arrDate);
 
-                if ("PICKUP".equals(type)) {
+                if (isPickTicket(stop)) {
                     sqlServerJdbc.update(
                         "UPDATE " + x3 + ".STOPREH SET "
                             + "DPEDAT_0 = ?, "      // departure date
@@ -577,5 +574,20 @@ public class TripServiceImpl implements TripService {
         return null;
     }
 
+    // BUG FIX: callers used to branch on "type"/"stopType", which is now
+    // ALWAYS "DROP" for every stop (business rule: pick tickets are a
+    // kind of drop — see X3RoutePlannerRepository.mapStop()). That made
+    // every pick-ticket stop silently fall into the SDELIVERY branch
+    // instead of STOPREH, so CONFIRM/OPTIMISE/DELETE affected 0 rows for
+    // pick tickets (no matching SDHNUM_0 for a PIC-prefixed doc number).
+    // "docType"/"doctype" ("DLV"/"PICK") still reliably identifies the
+    // underlying source table — it's untouched by the Drops/Pickups
+    // business-bucket reclassification.
+    private boolean isPickTicket(java.util.Map<String, Object> stop) {
+        String docType = getString(stop, "docType", "doctype");
+        if (docType != null) return "PICK".equalsIgnoreCase(docType);
+        // Fallback for any older payloads saved before docType was reliably sent
+        return "PICKUP".equals(getString(stop, "type", "stopType"));
+    }
 
 }

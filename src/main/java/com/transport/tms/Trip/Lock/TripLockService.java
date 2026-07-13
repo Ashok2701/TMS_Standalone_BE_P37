@@ -374,7 +374,6 @@ public class TripLockService {
                 String waitTime  = getString(s, "waitingTime");
                 String prevDist  = getString(s, "fromPrevDistance");
                 String prevTravel= getString(s, "fromPrevTravelTime");
-                String stopType  = getString(s, "type", "stopType");
                 String site      = trip.getSite();
 
                 // Parse dates
@@ -386,8 +385,9 @@ public class TripLockService {
                 double prevTravelNum = parseDouble(prevTravel);
                 double waitNum       = parseDouble(waitTime);
 
-                // DROP=1, PICKUP=2
-                int pickupDrop = "PICKUP".equals(stopType) ? 2 : 1;
+                // DROP=1, PICKUP=2 — use docType (reliable), not stopType
+                // (stopType is now always "DROP" for both DLV and PICK docs)
+                int pickupDrop = isPickTicket(s) ? 2 : 1;
 
                 sqlServerJdbc.update(sql,
                     // Keys
@@ -652,9 +652,8 @@ public class TripLockService {
                 objectMapper.getTypeFactory().constructCollectionType(List.class, Map.class));
             for (Map<String, Object> s : stops) {
                 String docNum = getString(s, "txn", "docNum", "id");
-                String type   = getString(s, "type", "stopType");
                 if (docNum == null) continue;
-                if ("PICKUP".equals(type)) {
+                if (isPickTicket(s)) {
                     sqlServerJdbc.update("UPDATE " + x3 + ".STOPREH SET XDLV_STATUS_0 = 2 WHERE PRHNUM_0 = ?", docNum);
                 } else {
                     sqlServerJdbc.update("UPDATE " + x3 + ".SDELIVERY SET XDLV_STATUS_0 = 2 WHERE SDHNUM_0 = ?", docNum);
@@ -664,6 +663,22 @@ public class TripLockService {
     }
 
     // ── Helpers ───────────────────────────────────────────────
+    // BUG FIX: this used to branch on "type"/"stopType", which is now
+    // ALWAYS "DROP" for every stop (business rule: pick tickets are a
+    // kind of drop — see X3RoutePlannerRepository.mapStop()). That made
+    // every pick-ticket stop silently fall into the SDELIVERY branch
+    // instead of STOPREH, so the update affected 0 rows (no matching
+    // SDHNUM_0 for a PIC-prefixed doc number) — nothing ever got written
+    // for pick tickets. "docType"/"doctype" ("DLV"/"PICK") is the field
+    // that still reliably identifies the underlying source table; it is
+    // NOT affected by the Drops/Pickups business-bucket reclassification.
+    private boolean isPickTicket(Map<String, Object> stop) {
+        String docType = getString(stop, "docType", "doctype");
+        if (docType != null) return "PICK".equalsIgnoreCase(docType);
+        // Fallback for any older payloads saved before docType was reliably sent
+        return "PICKUP".equals(getString(stop, "type", "stopType"));
+    }
+
     // ── Generate LVS number: {SITE}{YY}{MM}XCHG{0000001} ──────
     private String generateLvsNumber(String site, java.time.LocalDate docDate, String x3) {
         try {
