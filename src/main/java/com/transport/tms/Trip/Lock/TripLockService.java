@@ -98,9 +98,14 @@ public class TripLockService {
         sqlServerJdbc.update("DELETE FROM " + x3 + ".XX10CPLANCHA WHERE XNUMPC_0 = ?", tripCode);
 
         // 2. Reset XX10TRIPS
+        // NOTE: was setting X3 to "Open" while Postgres set "Optimised" on
+        // the very same unlock — the two sources disagreed. Unlock takes a
+        // Locked trip back to its pre-lock, already-optimised state, not
+        // all the way back to "Open" (that would misrepresent it as never
+        // having been through VROOM at all).
         try { sqlServerJdbc.update(
             "UPDATE " + x3 + ".XX10TRIPS SET lock = 0, optistatus = ? WHERE TRIPCODE = ?",
-            "Open", tripCode);
+            "Optimised", tripCode);
         } catch (Exception e) { log.warn("XX10TRIPS unlock failed: {}", e.getMessage()); }
 
         // 3. Postgres
