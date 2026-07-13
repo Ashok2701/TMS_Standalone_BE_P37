@@ -62,9 +62,12 @@ public class TripServiceImpl implements TripService {
         XrTrip saved = repo.save(trip);
 
         // ── X3 writes on CONFIRM ──────────────────────────────
-        // 1. Insert XX10TRIPS
-        try { writeX3Trip(saved); }
-        catch (Exception e) { System.err.println("X3 XX10TRIPS insert failed: " + e.getMessage()); }
+        // NOTE: XX10TRIPS is no longer maintained under the TMSNEW
+        // schema (confirmed: "Invalid object name 'TMSNEW.XX10TRIPS'").
+        // Postgres (XrTrip.optiStatus/lockFlag) remains the sole source
+        // of truth for trip status; writeX3Trip()/the DELETE+INSERT
+        // into XX10TRIPS has been removed rather than left to fail
+        // silently on every confirm.
 
         // 2. Update SDELIVERY/STOPREH: trip code + driver + vehicle + status=1
         try { updateStopDocuments(saved); }
@@ -207,14 +210,9 @@ public class TripServiceImpl implements TripService {
         XrTrip saved = repo.save(trip);
 
         // ── X3 writes on OPTIMISE ─────────────────────────────
-        // 3. Update XX10TRIPS.optistatus = Optimized
-        try {
-            String x3 = schemas.getX3Schema();
-            sqlServerJdbc.update(
-                "UPDATE " + x3 + ".XX10TRIPS SET optistatus = ? WHERE TRIPCODE = ?",
-                "Optimized", saved.getTripCode()
-            );
-        } catch (Exception e) { System.err.println("X3 XX10TRIPS optimise failed: " + e.getMessage()); }
+        // NOTE: XX10TRIPS no longer exists under TMSNEW — removed the
+        // optistatus UPDATE that was failing on every optimise.
+        // Postgres remains the source of truth for optiStatus.
 
         // 4. Update SDELIVERY/STOPREH: arrival + departure time per stop
         try { updateStopTimes(saved); }
@@ -427,22 +425,6 @@ public class TripServiceImpl implements TripService {
         dto.setCreateDate(t.getCreateDate());
         dto.setUpdateDate(t.getUpdateDate());
         return dto;
-    }
-    // ── Write trip to XX10TRIPS (X3 SQL Server) ──────────────
-    private void writeX3Trip(XrTrip trip) {
-        String x3 = schemas.getX3Schema();
-        // Upsert: delete + insert
-        sqlServerJdbc.update("DELETE FROM " + x3 + ".XX10TRIPS WHERE TRIPCODE = ?", trip.getTripCode());
-        sqlServerJdbc.update(
-            "INSERT INTO " + x3 + ".XX10TRIPS (TRIPCODE, optistatus, lock, FCY_0, DATLIV_0, VEHCODE, DRIVERID) VALUES (?,?,?,?,?,?,?)",
-            trip.getTripCode(),
-            "Open",
-            0,
-            trip.getSite(),
-            trip.getDocDate(),
-            trip.getVehicleCode(),
-            trip.getDriverId()
-        );
     }
 
     // ── Update SDELIVERY + STOPREH on CONFIRM ─────────────────

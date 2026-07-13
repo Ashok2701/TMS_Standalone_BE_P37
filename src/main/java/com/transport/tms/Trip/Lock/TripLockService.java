@@ -49,13 +49,12 @@ public class TripLockService {
         writePlanningHeader(trip, x3, userCode);
         writePlanningDetails(trip, x3, userCode);
 
-        // 2. XX10TRIPS
-        try { sqlServerJdbc.update(
-            "UPDATE " + x3 + ".XX10TRIPS SET lock = 1, optistatus = ? WHERE TRIPCODE = ?",
-            "Locked", tripCode);
-        } catch (Exception e) { log.warn("XX10TRIPS lock failed: {}", e.getMessage()); }
+        // NOTE: XX10TRIPS no longer exists under TMSNEW schema
+        // ("Invalid object name 'TMSNEW.XX10TRIPS'") — removed the
+        // lock/optistatus UPDATE that was failing on every lock.
+        // Postgres (XrTrip.optiStatus/lockFlag) is the source of truth.
 
-        // 3. Postgres
+        // 2. Postgres
         trip.setOptiStatus("Locked");
         trip.setLockFlag(1);
         trip.setDatExec(OffsetDateTime.now());
@@ -97,18 +96,13 @@ public class TripLockService {
         sqlServerJdbc.update("DELETE FROM " + x3 + ".XX10CPLANCHD WHERE XNUMPC_0 = ?", tripCode);
         sqlServerJdbc.update("DELETE FROM " + x3 + ".XX10CPLANCHA WHERE XNUMPC_0 = ?", tripCode);
 
-        // 2. Reset XX10TRIPS
-        // NOTE: was setting X3 to "Open" while Postgres set "Optimised" on
-        // the very same unlock — the two sources disagreed. Unlock takes a
-        // Locked trip back to its pre-lock, already-optimised state, not
-        // all the way back to "Open" (that would misrepresent it as never
-        // having been through VROOM at all).
-        try { sqlServerJdbc.update(
-            "UPDATE " + x3 + ".XX10TRIPS SET lock = 0, optistatus = ? WHERE TRIPCODE = ?",
-            "Optimised", tripCode);
-        } catch (Exception e) { log.warn("XX10TRIPS unlock failed: {}", e.getMessage()); }
+        // NOTE: XX10TRIPS no longer exists under TMSNEW — removed the
+        // lock/optistatus UPDATE that was failing on every unlock.
+        // Postgres is the sole source of truth for optiStatus/lockFlag;
+        // unlock takes a Locked trip back to "Optimised" there (it was
+        // already optimised via VROOM before being locked).
 
-        // 3. Postgres
+        // 2. Postgres
         trip.setOptiStatus("Optimised");
         trip.setLockFlag(0);
         tripRepository.save(trip);
