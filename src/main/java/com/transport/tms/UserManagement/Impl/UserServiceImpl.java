@@ -87,13 +87,16 @@ public class UserServiceImpl
         XRUser savedUser =
                 userRepository.save(user);
 
-        // save sites if required
+        // save sites if sent
+        // (see update() for why this no longer gates on
+        // userType.getRequiresSiteMapping() — always honor what the
+        // client actually submitted)
 
-        if(Boolean.TRUE.equals(
-                userType.getRequiresSiteMapping())) {
+        List<String> siteCodes = dto.getSites();
+        if (siteCodes != null && !siteCodes.isEmpty()) {
 
             List<XRUserSite> sites =
-                    dto.getSites()
+                    siteCodes
                             .stream()
                             .map(site -> {
 
@@ -174,16 +177,20 @@ public class UserServiceImpl
                 userRepository.save(user);
 
         // remove old sites
-
         userSiteRepository.deleteByUserUserId(id);
 
-        // add new sites
-
-        if(Boolean.TRUE.equals(
-                userType.getRequiresSiteMapping())) {
+        // BUG FIX: this used to be gated behind
+        // userType.getRequiresSiteMapping() — but the delete above always
+        // ran unconditionally, so if that flag wasn't set as expected for
+        // this user's type, sites were wiped and never re-added, even
+        // though the client explicitly sent a sites list. The client
+        // already decides what to submit; the backend shouldn't silently
+        // drop it. Always persist whatever was sent (null-safe).
+        List<String> siteCodes = dto.getSites();
+        if (siteCodes != null && !siteCodes.isEmpty()) {
 
             List<XRUserSite> sites =
-                    dto.getSites()
+                    siteCodes
                             .stream()
                             .map(site -> {
 

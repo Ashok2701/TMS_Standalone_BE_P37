@@ -25,6 +25,7 @@ public class TransportService {
     public List<SiteDTO> getSites() {
         return siteRepository.findAll().stream()
                 .filter(s -> Boolean.TRUE.equals(s.getActive()))
+                .filter(s -> Boolean.TRUE.equals(s.getTmsFlag()))
                 .map(this::toDTO)
                 .toList();
     }
