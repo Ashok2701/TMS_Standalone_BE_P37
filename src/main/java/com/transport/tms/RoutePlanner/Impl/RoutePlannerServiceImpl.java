@@ -86,7 +86,7 @@ public class RoutePlannerServiceImpl implements RoutePlannerService {
                         404, "Site not found or not TMS-enabled: " + siteCode));
 
         // ── 2. Vehicles from Postgres ─────────────────────────
-        List<Vehicle> vehicles = vehicleRepository.findAllActiveVehicles();
+        List<Vehicle> vehicles = vehicleRepository.findAllActiveVehicles(siteCode);
         log.info("RoutePlanner: {} vehicles", vehicles.size());
 
         // ── 3. Drivers from Postgres ──────────────────────────
