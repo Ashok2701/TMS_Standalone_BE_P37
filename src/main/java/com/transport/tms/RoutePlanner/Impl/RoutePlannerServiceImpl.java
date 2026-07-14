@@ -90,7 +90,7 @@ public class RoutePlannerServiceImpl implements RoutePlannerService {
         log.info("RoutePlanner: {} vehicles", vehicles.size());
 
         // ── 3. Drivers from Postgres ──────────────────────────
-        List<Driver> drivers = driverRepository.findAllActiveDrivers();
+        List<Driver> drivers = driverRepository.findAllActiveDrivers(siteCode);
         log.info("RoutePlanner: {} drivers", drivers.size());
 
         // ── 4. Deliveries from SQL Server (XTMSDLVY_TMS) ──────

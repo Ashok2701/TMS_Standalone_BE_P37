@@ -21,6 +21,9 @@ public class Driver {
     @Column(name = "driver_name")
     private String driverName;
 
+    @Column(name = "site_code")
+    private String site;          // site (xr_site.site_code)
+
     @Column(name = "active")
     private Boolean active = true;
 
