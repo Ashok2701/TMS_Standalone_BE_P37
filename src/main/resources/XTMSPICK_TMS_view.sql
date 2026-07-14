@@ -119,12 +119,9 @@ SELECT
         COLLATE Latin1_General_BIN2                 AS DLVMODE,
     ISNULL(P.XX10C_NUMPC_0, '')                     AS VRCODE,
     ISNULL(
-        SUBSTRING(D.XNUMPC_0, LEN(D.XNUMPC_0)-2, LEN(D.XNUMPC_0))
+        SUBSTRING(P.XX10C_NUMPC_0, LEN(P.XX10C_NUMPC_0)-2, LEN(P.XX10C_NUMPC_0))
     , '')                                           AS VRSEQ,
-    CASE
-        WHEN P.XSEQUENCE_0 != 0 THEN P.XSEQUENCE_0
-        ELSE ISNULL(D.SEQUENCE_0, 0)
-    END                                             AS SEQ,
+    ISNULL(P.XSEQUENCE_0, 0)                        AS SEQ,
 
     -- ── Departure / Arrival ───────────────────────────────────
     P.DPEDAT_0                                      AS DEPDATE,
@@ -132,33 +129,19 @@ SELECT
     P.ARVDAT_0                                      AS ARVDATE,
     P.ETA_0                                         AS ARVTIME,
 
-    -- ── Route status (same derived logic as XTMSDLVY_TMS) ────
+    -- ── Route status — derived from STOPREH alone (x3 stops
+    -- table only; no join to XX10CPLANCHD/XX10CLODSTOH/XX10TRIPS,
+    -- which are trip-planning state tables, not stops tables, and
+    -- were the source of duplicate-row fan-out) ────────────────
     (CASE
-        WHEN P.XX10C_NUMPC_0 IS NOT NULL OR P.XX10C_NUMPC_0 <> '' THEN
-            CASE
-                WHEN P.XDLV_STATUS_0 = 5
-                                                    THEN 'Skipped'
-                WHEN TP.lock = 0
-                 AND TP.optistatus IN ('Open', 'open')
-                                                    THEN 'Open'
-                WHEN TP.lock = 0
-                 AND TP.optistatus IN ('Optimized', 'optimized')
-                                                    THEN 'Optimized'
-                WHEN TP.lock = 1
-                 AND (L.XVRSEL_0 IS NULL OR L.XVRSEL_0 = '')
-                                                    THEN 'Locked'
-                WHEN L.XVRSEL_0 IS NOT NULL
-                 AND L.XLOADFLG_0 IN (1,2,3)       THEN 'LVS Generated'
-                WHEN L.XVRSEL_0 IS NOT NULL
-                 AND L.XLOADFLG_0 IN (4,6,7,8,9,10,12)
-                                                    THEN 'LVS Confirmed'
-                WHEN L.XVRSEL_0 IS NOT NULL
-                 AND L.XLOADFLG_0 = 11             THEN 'Cancelled'
-                WHEN L.XVRSEL_0 IS NOT NULL
-                 AND L.XLOADFLG_0 = 5              THEN 'Completed'
-                WHEN P.XX10C_NUMPC_0 = ''          THEN 'To Plan'
-            END
-     END)                                           AS ROUTESTATUS,
+        WHEN P.XX10C_NUMPC_0 IS NULL OR P.XX10C_NUMPC_0 = ''
+                                                    THEN 'To Plan'
+        WHEN P.XDLV_STATUS_0 = 5                   THEN 'Skipped'
+        WHEN P.XDLV_STATUS_0 = 8                   THEN 'Released'
+        WHEN P.XDLV_STATUS_0 = 2                   THEN 'Locked'
+        WHEN P.XDLV_STATUS_0 = 1                   THEN 'Allocated'
+        ELSE                                             'Open'
+    END)                                            AS ROUTESTATUS,
 
     -- ── Carrier ───────────────────────────────────────────────
     BC.BPTNAM_0                                     AS CARRIER,
@@ -179,16 +162,10 @@ LEFT JOIN  tbs.TMSNEW.BPCARRIER     BC
 JOIN       tbs.TMSNEW.BPDLVCUST     BS
     ON     BS.BPCNUM_0 = P.BPCORD_0
    AND     BS.BPAADD_0 = P.BPAADD_0
-LEFT JOIN  tbs.TMSNEW.XX10CPLANCHD  D
-    ON     D.SDHNUM_0  = P.PRHNUM_0
 LEFT JOIN  tbs.TMSNEW.ASTYLE        SS
     ON     SS.COD_0    = BC.XSTYLE_0
 LEFT JOIN  tbs.TMSNEW.XTMSROUTECODE RC
     ON     RC.LANNUM_0 = P.DRN_0
-LEFT JOIN  tbs.TMSNEW.XX10TRIPS     TP
-    ON     TP.TRIPCODE = P.XX10C_NUMPC_0
-LEFT JOIN  tbs.TMSNEW.XX10CLODSTOH  L
-    ON     L.XVRSEL_0  = TP.TRIPCODE
 
 WHERE
     -- GPS validity gate (same as XTMSDLVY_TMS)
