@@ -107,18 +107,19 @@ SELECT
     S.ARVDAT_0                                      AS ARVDATE,
     S.ETA_0                                         AS ARVTIME,
 
-    -- ── Route status — derived from SDELIVERY alone (x3 stops
+    -- ── Route status — derived from XDLV_STATUS_0 alone (x3 stops
     -- table only; no join to XX10CPLANCHD/XX10CLODSTOH/XX10TRIPS,
     -- which are trip-planning state tables, not stops tables, and
-    -- were the source of duplicate-row fan-out) ────────────────
+    -- were the source of duplicate-row fan-out). Status codes:
+    --   0 or 8 = To Plan, 1 = Scheduled, 4 = Completed, 5 = Skipped
+    --   2 = Locked (set internally on Validate) ──────────────────
     (CASE
-        WHEN S.XX10C_NUMPC_0 IS NULL OR S.XX10C_NUMPC_0 = ''
-                                                    THEN 'To Plan'
-        WHEN S.XDLV_STATUS_0 = 5                   THEN 'Skipped'
-        WHEN S.XDLV_STATUS_0 = 8                   THEN 'Released'
-        WHEN S.XDLV_STATUS_0 = 2                   THEN 'Locked'
-        WHEN S.XDLV_STATUS_0 = 1                   THEN 'Allocated'
-        ELSE                                             'Open'
+        WHEN S.XDLV_STATUS_0 IN (0, 8)              THEN 'To Plan'
+        WHEN S.XDLV_STATUS_0 = 1                    THEN 'Scheduled'
+        WHEN S.XDLV_STATUS_0 = 4                    THEN 'Completed'
+        WHEN S.XDLV_STATUS_0 = 5                    THEN 'Skipped'
+        WHEN S.XDLV_STATUS_0 = 2                    THEN 'Locked'
+        ELSE                                             'To Plan'
     END)                                            AS ROUTESTATUS,
 
     -- ── Carrier ───────────────────────────────────────────────
