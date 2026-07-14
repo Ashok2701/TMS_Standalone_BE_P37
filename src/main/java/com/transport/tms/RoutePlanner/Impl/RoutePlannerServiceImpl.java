@@ -158,8 +158,35 @@ public class RoutePlannerServiceImpl implements RoutePlannerService {
             String label) {
         try {
             List<RoutePlannerStopDTO> result = fetcher.get();
-            log.info("RoutePlanner: {} {} fetched from X3", result.size(), label);
-            return result;
+
+            // Dedupe by docNum. The underlying SQL Server views
+            // (XTMSDLVY_TMS / XTMSPICK_TMS) LEFT JOIN one-to-many tables
+            // (XX10CPLANCHD via SDHNUM_0/PRHNUM_0, XX10CLODSTOH via
+            // TRIPCODE) — if either has more than one matching row for a
+            // given document, the header row fans out into duplicate
+            // stops with the same docNum. A stop should never appear
+            // twice in this response regardless of what's producing the
+            // fan-out upstream, so guard against it here rather than in
+            // the view (can't safely rewrite that blind without DB
+            // access to verify the actual cause).
+            List<RoutePlannerStopDTO> deduped = result.stream()
+                    .collect(Collectors.toMap(
+                            RoutePlannerStopDTO::getDocNum,
+                            s -> s,
+                            (first, dup) -> first,   // keep first occurrence
+                            java.util.LinkedHashMap::new
+                    ))
+                    .values()
+                    .stream()
+                    .toList();
+
+            if (deduped.size() != result.size()) {
+                log.warn("RoutePlanner: {} {} fetched from X3, {} duplicate docNum(s) removed",
+                        result.size(), label, result.size() - deduped.size());
+            } else {
+                log.info("RoutePlanner: {} {} fetched from X3", deduped.size(), label);
+            }
+            return deduped;
         } catch (Exception e) {
             log.error("RoutePlanner: failed to fetch {} from X3 — {}", label, e.getMessage());
             return List.of();
