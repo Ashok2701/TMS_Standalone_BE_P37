@@ -25,6 +25,12 @@ public class X3SoapController {
         return soapService.confirmLvs(lvsNum);
     }
 
+    /** Confirm route/trip in X3 — X1CONFIRM (input: I_XNUMPC = VR/trip number) */
+    @PostMapping("/confirm-route")
+    public Map<String, Object> confirmRoute(@RequestParam String vrNumber) {
+        return soapService.confirmRoute(vrNumber);
+    }
+
     /** Get route/trip detail — X1CROUTDET */
     @GetMapping("/route-detail")
     public Map<String, Object> getRouteDetail(@RequestParam String vrNum) {
