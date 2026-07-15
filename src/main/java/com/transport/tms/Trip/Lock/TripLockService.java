@@ -474,6 +474,7 @@ public class TripLockService {
         String endTime       = trip.getEndTime()     != null ? trip.getEndTime()     : e;
         String arrSite       = trip.getArrSite()     != null ? trip.getArrSite()     : e;
         double capWeight     = parseDoubleSafe(trip.getTotalWeight());
+        int totalCases       = computeTotalCases(trip);
         java.time.LocalDate  doc   = trip.getDocDate() != null ? trip.getDocDate() : java.time.LocalDate.now();
         LocalDateTime docDt  = doc.atStartOfDay();
 
@@ -557,6 +558,7 @@ public class TripLockService {
         p.add(capWeight);   // XCAPACITIES_0 — trip weight
         p.add(0.0);         // XVEHVOL_0
         p.add(0.0);         // XTOTSHESTK_0
+        p.add(totalCases);  // XTOTCASES_0 — NOT NULL, sum of stop qty (nbPack)
         p.add(e);           // XSEALNUMH_0
         p.add(0);           // XUNLOADFLG_0
         p.add(0);           // XSTARTODMTR_0
@@ -619,7 +621,7 @@ public class TripLockService {
             + "XVRSEL_0,XLOADREF_0,CODEYVE_0,XVALFLG_0,LOCSEL_0,"
             + "XROUTNBR_0,XTEXTNUM_0,XTOTNONSTK_0,XCODEYVE_0,XLOADFLG_0,"
             + "X10CHKIN_0,XXIPTDAT_0,XSCHREALC_0,XCAPACITIES_0,XVEHVOL_0,"
-            + "XTOTSHESTK_0,XSEALNUMH_0,XUNLOADFLG_0,XSTARTODMTR_0,XENDODMTR_0,"
+            + "XTOTSHESTK_0,XTOTCASES_0,XSEALNUMH_0,XUNLOADFLG_0,XSTARTODMTR_0,XENDODMTR_0,"
             + "XCHKINDAT_0,XCHKINTIM_0,XCHKOUDAT_0,XCHKOUTIM_0,"
             + "XPMASS_0,XPVOL_0,XMASS_0,XVMASS_0,XLMASS_0,XVOLCAM_0,XVEHV_0,XMPVOL_0,"
             + "XUNLOADDATE_0,XUNLOADEDBY_0,XUNLOADTIME_0,"
