@@ -151,6 +151,8 @@ public class TripLockService {
         String[] emptyEquip = new String[99];
         java.util.Arrays.fill(emptyEquip, emptyStr);
 
+        int totalCases = computeTotalCases(trip);
+
         // Build column list
         StringBuilder cols = new StringBuilder(
             "UPDTICK_0,XNUMPC_0,BPTNUM_0,CODEYVE_0,XCODEYVE_0,HEUDEP_0,"
@@ -169,7 +171,7 @@ public class TripLockService {
             + "XUNIT_0,XUNIT1_0,XUNIT2_0,XVOLUME_0,XVOL1_0,XVOL2_0,XVOLU_0,XMASSU_0,XMASSU1_0,XVOLU1_0,"
             + "POURLOAKG_0,POURLOAM3_0,XDPRTFDR_0,XRTNFDR_0,"
             + "RHEUDEP_0,RDATLIV_0,RHEUARR_0,RDATARR_0,"
-            + "TRAILER_0,TRAILER_1,"
+            + "TRAILER_0,TRAILER_1,XTOTCASES_0,"
         );
         // XEQUIPID_0..98
         for (int i = 0; i <= 98; i++) cols.append("XEQUIPID_").append(i).append(",");
@@ -251,6 +253,7 @@ public class TripLockService {
         params.add(emptyStr); params.add(docDateDt); params.add(emptyStr); params.add(docDateDt);
         // Trailers
         params.add(emptyStr); params.add(emptyStr);
+        params.add(totalCases);          // XTOTCASES_0 — NOT NULL, sum of stop qty (nbPack)
         // XEQUIPID_0..98
         for (int i = 0; i <= 98; i++) params.add(emptyStr);
         // Tail fields
@@ -654,6 +657,30 @@ public class TripLockService {
                 }
             }
         } catch (Exception e) { log.warn("Validate doc status failed for {}: {}", trip.getTripCode(), e.getMessage()); }
+    }
+
+    // Sums each stop's package/case count (qty, sourced from nbPack on the
+    // stops view) to give XTOTCASES_0 a real value instead of a hardcoded 0.
+    // Defensive: any parse failure or missing field just contributes 0,
+    // never throws — this must not block the Lock insert.
+    @SuppressWarnings("unchecked")
+    private int computeTotalCases(XrTrip trip) {
+        if (trip.getStopObjectsJson() == null) return 0;
+        try {
+            List<Map<String, Object>> stops = objectMapper.readValue(trip.getStopObjectsJson(),
+                objectMapper.getTypeFactory().constructCollectionType(List.class, Map.class));
+            int total = 0;
+            for (Map<String, Object> s : stops) {
+                String raw = getString(s, "qty", "nbPack");
+                if (raw == null || raw.isBlank()) continue;
+                try { total += (int) Double.parseDouble(raw); }
+                catch (NumberFormatException ignored) { /* skip unparsable */ }
+            }
+            return total;
+        } catch (Exception e) {
+            log.warn("computeTotalCases failed for {}: {}", trip.getTripCode(), e.getMessage());
+            return 0;
+        }
     }
 
     // ── Helpers ───────────────────────────────────────────────
