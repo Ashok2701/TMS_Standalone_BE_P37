@@ -152,6 +152,10 @@ public class VehicleServiceImpl implements VehicleService {
         e.setExternalVehicle(dto.getExternalVehicle());
 
         // Image — decode Base64 → binary
+        // BUG FIX: this used to only ever SET the image when a non-blank
+        // value was sent, and did nothing otherwise — meaning removing
+        // the image (frontend sends image: null/"") left the old binary
+        // untouched in the DB. Explicit null/blank now clears it.
         if (dto.getImage() != null && !dto.getImage().isBlank()) {
             try {
                 String b64 = dto.getImage().contains(",")
@@ -159,6 +163,8 @@ public class VehicleServiceImpl implements VehicleService {
                         : dto.getImage();
                 e.setVehicleImage(Base64.getDecoder().decode(b64));
             } catch (Exception ignored) {}
+        } else {
+            e.setVehicleImage(null);
         }
 
         // Status
