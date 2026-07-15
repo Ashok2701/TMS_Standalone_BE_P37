@@ -6,9 +6,12 @@ import org.w3c.dom.*;
 import org.xml.sax.InputSource;
 
 import javax.xml.parsers.DocumentBuilderFactory;
+import javax.net.ssl.*;
 import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.security.SecureRandom;
+import java.security.cert.X509Certificate;
 import java.util.*;
 
 /**
@@ -172,6 +175,28 @@ public class X3SoapService {
     private String sendSoap(String envelope) throws Exception {
         URL url = new URL(soapUrl);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+
+        // TEMPORARY: unblock "PKIX path building failed" against
+        // tmsx3em.tema-systems.com. This is a Java-level trust-store
+        // issue — the JVM's default cacerts doesn't have a valid chain
+        // for that host's certificate (internal/private CA, or the
+        // server isn't serving its intermediate cert). The correct fix
+        // is either (a) import the real chain into the JVM's cacerts via
+        // keytool, or (b) have the X3/ops team fix the server to serve
+        // its full intermediate chain — either of those removes the
+        // need for this workaround entirely.
+        //
+        // Scoped ONLY to this connection object (setSSLSocketFactory on
+        // the instance) — NOT HttpsURLConnection.setDefaultSSLSocketFactory(),
+        // which would disable certificate validation for every HTTPS call
+        // in the whole JVM. This still leaves the app vulnerable to a
+        // MITM on this one specific internal connection, so treat it as
+        // a stopgap for testing, not a production-ready state.
+        if (conn instanceof HttpsURLConnection https) {
+            https.setSSLSocketFactory(trustAllSslContext().getSocketFactory());
+            https.setHostnameVerifier((hostname, session) -> true);
+        }
+
         conn.setDoOutput(true);
         conn.setRequestMethod("POST");
         conn.setRequestProperty("Content-Type", "text/xml; charset=utf-8");
@@ -197,6 +222,21 @@ public class X3SoapService {
             if (status >= 400) throw new RuntimeException("HTTP " + status + ": " + sb);
             return sb.toString();
         }
+    }
+
+    // See sendSoap() comment above — TEMPORARY stopgap for the
+    // internal X3 host's cert-chain trust issue, scoped per-connection.
+    private SSLContext trustAllSslContext() throws Exception {
+        TrustManager[] trustAll = new TrustManager[] {
+            new X509TrustManager() {
+                public void checkClientTrusted(X509Certificate[] chain, String authType) {}
+                public void checkServerTrusted(X509Certificate[] chain, String authType) {}
+                public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
+            }
+        };
+        SSLContext sc = SSLContext.getInstance("TLS");
+        sc.init(null, trustAll, new SecureRandom());
+        return sc;
     }
 
     // ═══════════════════════════════════════════════════════════
