@@ -353,7 +353,7 @@ public class TripLockService {
             + "?,?,?,?,?,"             // RAINONAFF 0-4
             + "1,0,?,?,0,0,0,1,"       // OPTISTA_0=1, XLOADED_0=0, XACTETA_0, XACTETD_0, flags, XDLV_STATUS_0=1
             + "?,?,?,0,?,0,0,?,"       // XMS_0, XVOL_0, SERVICETIME_0, XCALCDIS_0=0, XWAITTIME_0, SWAITTIME_0=0, SERVICETIM_0
-            + "1,?,?,?,0,"             // XDOCTYP_0=1, XPICKUP_DROP_0, XSEALNUM_0, XSKIPRES_0, XACTSEQ_0=0
+            + "?,?,?,?,0,"             // XDOCTYP_0 (dynamic per doc type), XPICKUP_DROP_0, XSEALNUM_0, XSKIPRES_0, XACTSEQ_0=0
             + "?,?,?,?,"               // RDEPARTDATE_0, RDEPARTTIME_0, RARRIVEDATE_0, RARRIVETIME_0
             + "?,?,?,?,"               // XCNFARRDATE_0, XCNFARRTIME_0, XCNFDEPDATE_0, XCNFDEPTIME_0
             + "0,0,?,0,0,?,?"          // XDOCSTA_0=0, XACTDISTMTS_0=0, XDOCSITE_0, XBREAKTYP_0=0, XLOADBAY_0=0, XSPECIFICRES_0, AUUID_0
@@ -385,6 +385,14 @@ public class TripLockService {
                 // DROP=1, PICKUP=2 — use docType (reliable), not stopType
                 // (stopType is now always "DROP" for both DLV and PICK docs)
                 int pickupDrop = isPickTicket(s) ? 2 : 1;
+
+                // XDOCTYP_0 — X3's document-type list of values:
+                // 1=Delivery, 2=Pre Receipt, 3=Customer Return,
+                // 4=Pick Ticket, 5=Purchase Return, 6=Misc Stop,
+                // 8=Break, 9=Sales Order. Was hardcoded to 1 for every
+                // stop regardless of actual doc type — now set correctly
+                // per stop using the same reliable docType check.
+                int docTypeCode = isPickTicket(s) ? 4 : 1;
 
                 sqlServerJdbc.update(sql,
                     // Keys
@@ -419,8 +427,8 @@ public class TripLockService {
                     srvTime != null ? srvTime : emptyStr,
                     waitNum,
                     srvTime != null ? srvTime : emptyStr,
-                    // XPICKUP_DROP_0, XSEALNUM_0, XSKIPRES_0
-                    pickupDrop, emptyStr, emptyStr,
+                    // XDOCTYP_0, XPICKUP_DROP_0, XSEALNUM_0, XSKIPRES_0
+                    docTypeCode, pickupDrop, emptyStr, emptyStr,
                     // RDEPARTDATE_0, RDEPARTTIME_0, RARRIVEDATE_0, RARRIVETIME_0
                     now, emptyStr, now, emptyStr,
                     // XCNFARRDATE_0, XCNFARRTIME_0, XCNFDEPDATE_0, XCNFDEPTIME_0
