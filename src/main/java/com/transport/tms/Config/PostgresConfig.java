@@ -14,6 +14,8 @@ import org.springframework.orm.jpa.JpaTransactionManager;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
 import org.springframework.transaction.PlatformTransactionManager;
 
+import org.springframework.jdbc.core.JdbcTemplate;
+
 import javax.sql.DataSource;
 import java.util.HashMap;
 import java.util.Map;
@@ -30,7 +32,8 @@ import java.util.Map;
                 "com.transport.tms.UserManagement.Repository",
                 "com.transport.tms.Configuration.Document.Repository",
                 "com.transport.tms.RoutePlanner.Repository",
-                "com.transport.tms.Trip.Repository"
+                "com.transport.tms.Trip.Repository",
+                "com.transport.tms.Reports.Repository"
         },
         entityManagerFactoryRef = "postgresEntityManagerFactory",
         transactionManagerRef = "postgresTransactionManager"
@@ -59,6 +62,13 @@ public class PostgresConfig {
     }
 
     @Primary
+    @Bean(name = "postgresJdbcTemplate")
+    public JdbcTemplate postgresJdbcTemplate(
+            @Qualifier("postgresDataSource") DataSource dataSource) {
+        return new JdbcTemplate(dataSource);
+    }
+
+    @Primary
     @Bean(name = "postgresEntityManagerFactory")
     public LocalContainerEntityManagerFactoryBean postgresEntityManagerFactory(
             EntityManagerFactoryBuilder builder) {
@@ -77,7 +87,8 @@ public class PostgresConfig {
                         "com.transport.tms.Sync.Site.Entity",
                         "com.transport.tms.Configuration.Document.Entity",
                         "com.transport.tms.RoutePlanner.Repository",
-                "com.transport.tms.Trip.Entity"               // XrTrip @Entity
+                        "com.transport.tms.Trip.Entity",               // XrTrip @Entity
+                        "com.transport.tms.Reports.Entity"
                 )
                 .persistenceUnit("postgres")
                 .properties(properties)
