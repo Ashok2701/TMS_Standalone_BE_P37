@@ -72,6 +72,28 @@ public class VehicleServiceImpl implements VehicleService {
                 .toList();
     }
 
+    // ── BULK CREATE-OR-UPDATE ──────────────────────────────────
+    // Per row: create if vehicleCode doesn't exist yet, update if it
+    // does. Never lets one bad row abort the batch — every row is
+    // wrapped so a failure just gets recorded in the result list.
+    @Override
+    public List<com.transport.tms.Fleet.Dto.BulkRowResult> bulkCreateOrUpdate(List<VehicleDTO> rows) {
+        List<com.transport.tms.Fleet.Dto.BulkRowResult> results = new java.util.ArrayList<>(rows.size());
+        for (int i = 0; i < rows.size(); i++) {
+            VehicleDTO dto = rows.get(i);
+            String code = dto.getVehicleCode();
+            boolean isUpdate = code != null && vehicleRepository.existsByVehicleCode(code);
+            try {
+                if (isUpdate) update(code, dto);
+                else create(dto);
+                results.add(new com.transport.tms.Fleet.Dto.BulkRowResult(i, true, isUpdate, code, null));
+            } catch (Exception e) {
+                results.add(new com.transport.tms.Fleet.Dto.BulkRowResult(i, false, isUpdate, code, e.getMessage()));
+            }
+        }
+        return results;
+    }
+
     // ── DTO → Entity ──────────────────────────────────────────
     private void fromDTO(VehicleDTO dto, Vehicle e) {
         e.setVehicleCode(dto.getVehicleCode());

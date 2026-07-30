@@ -1,6 +1,7 @@
 package com.transport.tms.Fleet.Service;
 
 import com.transport.tms.Fleet.Dto.VehicleCategoryDTO;
+import com.transport.tms.Fleet.Dto.BulkRowResult;
 
 import java.util.List;
 
@@ -20,4 +21,7 @@ public interface VehicleCategoryService {
 
     void delete(
             String categoryCode);
+
+    /** Bulk create-or-update, same semantics as VehicleService — see there. */
+    List<BulkRowResult> bulkCreateOrUpdate(List<VehicleCategoryDTO> rows);
 }

@@ -22,6 +22,13 @@ public class VehicleCategoryController {
         return service.create(dto);
     }
 
+    /** Bulk create-or-update — used by the Bulk Activity CSV/XLSX import page. */
+    @PostMapping("/bulk")
+    public List<com.transport.tms.Fleet.Dto.BulkRowResult> bulkCreateOrUpdate(
+            @RequestBody List<VehicleCategoryDTO> rows) {
+        return service.bulkCreateOrUpdate(rows);
+    }
+
     @PutMapping("/{categoryCode}")
     public VehicleCategoryDTO update(
             @PathVariable String categoryCode,

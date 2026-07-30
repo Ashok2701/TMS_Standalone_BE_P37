@@ -22,6 +22,13 @@ public class DriverController {
         return service.create(dto);
     }
 
+    /** Bulk create-or-update — used by the Bulk Activity CSV/XLSX import page. */
+    @PostMapping("/bulk")
+    public List<com.transport.tms.Fleet.Dto.BulkRowResult> bulkCreateOrUpdate(
+            @RequestBody List<DriverDTO> rows) {
+        return service.bulkCreateOrUpdate(rows);
+    }
+
     @PutMapping("/{driverId}")
     public DriverDTO update(
             @PathVariable String driverId,

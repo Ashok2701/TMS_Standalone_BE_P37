@@ -125,6 +125,24 @@ public class DriverServiceImpl
     }
 
     @Override
+    public List<com.transport.tms.Fleet.Dto.BulkRowResult> bulkCreateOrUpdate(List<DriverDTO> rows) {
+        List<com.transport.tms.Fleet.Dto.BulkRowResult> results = new java.util.ArrayList<>(rows.size());
+        for (int i = 0; i < rows.size(); i++) {
+            DriverDTO dto = rows.get(i);
+            String id = dto.getDriverId();
+            boolean isUpdate = id != null && repository.existsByDriverId(id);
+            try {
+                if (isUpdate) update(id, dto);
+                else create(dto);
+                results.add(new com.transport.tms.Fleet.Dto.BulkRowResult(i, true, isUpdate, id, null));
+            } catch (Exception e) {
+                results.add(new com.transport.tms.Fleet.Dto.BulkRowResult(i, false, isUpdate, id, e.getMessage()));
+            }
+        }
+        return results;
+    }
+
+    @Override
     public void delete(
             String driverId) {
 

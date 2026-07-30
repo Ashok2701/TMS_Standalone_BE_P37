@@ -97,6 +97,24 @@ public class VehicleCategoryServiceImpl
     }
 
     @Override
+    public List<com.transport.tms.Fleet.Dto.BulkRowResult> bulkCreateOrUpdate(List<VehicleCategoryDTO> rows) {
+        List<com.transport.tms.Fleet.Dto.BulkRowResult> results = new java.util.ArrayList<>(rows.size());
+        for (int i = 0; i < rows.size(); i++) {
+            VehicleCategoryDTO dto = rows.get(i);
+            String code = dto.getCategoryCode();
+            boolean isUpdate = code != null && repository.existsByCategoryCode(code);
+            try {
+                if (isUpdate) update(code, dto);
+                else create(dto);
+                results.add(new com.transport.tms.Fleet.Dto.BulkRowResult(i, true, isUpdate, code, null));
+            } catch (Exception e) {
+                results.add(new com.transport.tms.Fleet.Dto.BulkRowResult(i, false, isUpdate, code, e.getMessage()));
+            }
+        }
+        return results;
+    }
+
+    @Override
     public void delete(
             String categoryCode) {
 
