@@ -103,6 +103,25 @@ public class TripServiceImpl implements TripService {
     @Override
     public TripResponseDTO updateTrip(String tripCode, TripRequestDTO req) {
         XrTrip trip = findOrThrow(tripCode);
+
+        // Rule: changing the vehicle on an already-Optimised trip
+        // invalidates the optimisation — timings/weight/volume were all
+        // computed for the PREVIOUS vehicle's capacity/route. Detected
+        // BEFORE mapRequestToEntity() overwrites trip.vehicleCode below,
+        // by comparing against what's currently in the DB.
+        //
+        // This mirrors a reset the frontend already does optimistically
+        // in local state right after this same call — but without this,
+        // that optimistic patch gets silently overwritten the moment this
+        // endpoint's response comes back, since optiStatus was never
+        // actually changed here. This makes it durable.
+        boolean vehicleChanged = req.getVehicleCode() != null
+                && !req.getVehicleCode().equals(trip.getVehicleCode());
+        boolean wasOptimised = "Optimised".equals(trip.getOptiStatus());
+        if (vehicleChanged && wasOptimised) {
+            trip.setOptiStatus("Open");
+        }
+
         mapRequestToEntity(req, trip);
         trip.setStops((req.getDrops() == null ? 0 : req.getDrops())
                     + (req.getPickups() == null ? 0 : req.getPickups()));
