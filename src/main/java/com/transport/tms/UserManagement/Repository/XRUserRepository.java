@@ -18,6 +18,8 @@ public interface XRUserRepository
 
     boolean existsByUsername(String username);
 
+    boolean existsByRoleRoleId(UUID roleId);
+
     @Query("""
     SELECT u
     FROM XRUser u

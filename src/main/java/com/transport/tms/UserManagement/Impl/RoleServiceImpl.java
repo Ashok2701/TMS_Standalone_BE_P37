@@ -3,10 +3,13 @@ package com.transport.tms.UserManagement.Impl;
 
 import com.transport.tms.UserManagement.Dto.RoleDTO;
 import com.transport.tms.UserManagement.Entity.XRRole;
+import com.transport.tms.UserManagement.Repository.RoleModuleRepository;
 import com.transport.tms.UserManagement.Repository.XRRoleRepository;
+import com.transport.tms.UserManagement.Repository.XRUserRepository;
 import com.transport.tms.UserManagement.Service.RoleService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
@@ -16,6 +19,10 @@ import java.util.UUID;
 public class RoleServiceImpl implements RoleService {
 
     private final XRRoleRepository repository;
+
+    private final RoleModuleRepository roleModuleRepository;
+
+    private final XRUserRepository userRepository;
 
     @Override
     public RoleDTO create(RoleDTO dto) {
@@ -71,7 +78,30 @@ public class RoleServiceImpl implements RoleService {
     }
 
     @Override
+    @Transactional
+    // BUG FIX: this was a plain repository.deleteById(id) — the raw SQL
+    // error you hit ('violates foreign key constraint fk_role ... still
+    // referenced from table xr_role_modules') was Postgres correctly
+    // blocking a delete that would have orphaned those rows, since
+    // nothing here ever cleaned them up first.
     public void delete(UUID id) {
+
+        repository.findById(id)
+                .orElseThrow(() ->
+                        new RuntimeException("Role not found"));
+
+        // xr_users.role_id has the same FK to xr_roles — deleting a role
+        // still assigned to users would hit the identical constraint
+        // violation there. Block with a clear message instead of letting
+        // that raw SQL exception surface, same as the one you just saw.
+        if (userRepository.existsByRoleRoleId(id)) {
+            throw new RuntimeException(
+                    "Cannot delete role — one or more users are still assigned to it. Reassign them to a different role first.");
+        }
+
+        // Safe to cascade — these are just this role's module
+        // assignments (from Assign Modules to Roles), not user data.
+        roleModuleRepository.deleteByRoleRoleId(id);
 
         repository.deleteById(id);
     }
