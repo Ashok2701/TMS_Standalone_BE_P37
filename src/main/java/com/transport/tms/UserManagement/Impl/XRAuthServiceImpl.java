@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -38,6 +39,17 @@ public class XRAuthServiceImpl implements XRAuthService {
     private String contextPath;
 
     @Override
+    @Transactional(readOnly = true)
+    // BUG FIX: "Could not initialize proxy [...XRModule...] - no session".
+    // XRRoleModule.module (and XRUser.role/userType) are all
+    // @ManyToOne(fetch = LAZY). Without @Transactional here, each
+    // repository call below (findByUsername, findByRoleRoleId, etc.) ran
+    // in its OWN short-lived Hibernate session that closed as soon as
+    // that call returned — so by the time mapPermission() below tried to
+    // lazily access rm.getModule().getModuleCode(), the session it needed
+    // was already gone. @Transactional keeps a single session open for
+    // this whole method, resolving all the lazy proxies used throughout
+    // (role, userType, and each permission's module).
     public LoginResponseDTO login(
             LoginRequestDTO dto,
             HttpServletResponse response) {
