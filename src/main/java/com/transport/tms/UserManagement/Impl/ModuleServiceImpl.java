@@ -56,7 +56,9 @@ public class ModuleServiceImpl
         entity.setDisplayOrder(
                 dto.getDisplayOrder());
 
-        entity.setActive(true);
+        // Same fix as UserTypeServiceImpl.create() — was hardcoded to
+        // true regardless of what the create form actually submitted.
+        entity.setActive(dto.getActive() != null ? dto.getActive() : true);
 
         // save
 

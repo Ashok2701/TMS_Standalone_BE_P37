@@ -44,7 +44,12 @@ public class UserTypeServiceImpl
         entity.setRequiresSiteMapping(
                 dto.getRequiresSiteMapping());
 
-        entity.setActive(true);
+        // BUG FIX: was hardcoded to true, ignoring whatever the create
+        // form actually submitted — a new User Type created as
+        // "Inactive" always came back Active regardless. Defaults to
+        // true only when the field is genuinely absent (null), same as
+        // the previous behavior for a form that doesn't set it at all.
+        entity.setActive(dto.getActive() != null ? dto.getActive() : true);
 
         // save
 

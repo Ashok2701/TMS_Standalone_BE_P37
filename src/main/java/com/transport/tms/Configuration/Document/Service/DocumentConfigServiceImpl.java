@@ -30,7 +30,7 @@ public class DocumentConfigServiceImpl
         entity.setDisplayNameEn(dto.getDisplayNameEn());
         entity.setDisplayNameFr(dto.getDisplayNameFr());
         entity.setColorCode(normalizeColorCode(dto.getColorCode()));
-        entity.setActive(true);
+        entity.setActive(dto.getActive() != null ? dto.getActive() : true);
         entity.setCreatedBy(dto.getCreatedBy());
         entity.setCreatedAt(LocalDateTime.now());
         entity.setUpdatedBy(dto.getCreatedBy());

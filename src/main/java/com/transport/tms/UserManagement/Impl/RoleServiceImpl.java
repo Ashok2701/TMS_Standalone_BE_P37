@@ -35,7 +35,7 @@ public class RoleServiceImpl implements RoleService {
 
         role.setRoleCode(dto.getRoleCode());
         role.setRoleName(dto.getRoleName());
-        role.setActive(true);
+        role.setActive(dto.getActive() != null ? dto.getActive() : true);
 
         XRRole saved = repository.save(role);
 

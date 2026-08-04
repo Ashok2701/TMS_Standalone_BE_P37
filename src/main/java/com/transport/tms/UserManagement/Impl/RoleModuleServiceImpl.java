@@ -45,6 +45,18 @@ public class RoleModuleServiceImpl
 
         repository.deleteByRoleRoleId(roleId);
 
+        // BUG FIX: deleteByRoleRoleId (a derived delete method, no
+        // @Query) is implemented as "load matching entities, then queue
+        // each for removal" — it goes through Hibernate's persistence
+        // context, not an immediate bulk DELETE. Without flushing here,
+        // Hibernate's default flush ordering can execute the saveAll()
+        // INSERTs below BEFORE these queued deletes actually hit the
+        // database, which is exactly what produced "duplicate key value
+        // violates unique constraint uk_role_module ... already exists"
+        // on an insert for a (role_id, module_id) pair whose delete you
+        // already called — the delete just hadn't landed yet.
+        repository.flush();
+
         List<XRRoleModule> entities =
                 new ArrayList<>();
 

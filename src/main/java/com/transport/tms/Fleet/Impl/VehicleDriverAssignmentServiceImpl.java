@@ -37,7 +37,7 @@ public class VehicleDriverAssignmentServiceImpl
     public VehicleDriverAssignmentDTO create(
             VehicleDriverAssignmentDTO dto) {
 
-        validateAssignment(dto);
+        validateAssignment(dto, null);
 
         Vehicle vehicle =
                 vehicleRepository.findById(
@@ -83,7 +83,7 @@ public class VehicleDriverAssignmentServiceImpl
                                 new RuntimeException(
                                         "Assignment not found"));
 
-        validateAssignment(dto);
+        validateAssignment(dto, assignmentId);
 
         Vehicle vehicle =
                 vehicleRepository.findById(
@@ -143,7 +143,8 @@ public class VehicleDriverAssignmentServiceImpl
     }
 
     private void validateAssignment(
-            VehicleDriverAssignmentDTO dto) {
+            VehicleDriverAssignmentDTO dto,
+            UUID excludeAssignmentId) {
 
         LocalDate endDate =
                 dto.getEndDate() == null
@@ -153,7 +154,8 @@ public class VehicleDriverAssignmentServiceImpl
         if(repository.countDriverOverlap(
                 dto.getDriverId(),
                 dto.getStartDate(),
-                endDate) > 0) {
+                endDate,
+                excludeAssignmentId) > 0) {
 
             throw new RuntimeException(
                     "Driver already assigned during selected period");
@@ -162,7 +164,8 @@ public class VehicleDriverAssignmentServiceImpl
         if(repository.countVehicleOverlap(
                 dto.getVehicleCode(),
                 dto.getStartDate(),
-                endDate) > 0) {
+                endDate,
+                excludeAssignmentId) > 0) {
 
             throw new RuntimeException(
                     "Vehicle already assigned during selected period");
