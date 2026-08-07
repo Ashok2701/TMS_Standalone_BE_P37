@@ -14,7 +14,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-@RestController
+// DISABLED for now, per instruction — only driver login is needed at
+// this stage, not the trip/stop/POD-submission data endpoints. This
+// isn't required for login to work (login has zero dependency on
+// PodRepository/xr_pod at all — see DriverAuthServiceImpl), but keeping
+// this surface off until the xr_pod table is actually ready avoids
+// exposing endpoints that would 500 on first real use ("relation
+// xr_pod does not exist"). Re-enable by uncommenting @RestController
+// once the table (see POD_API_DOCUMENTATION.md's migration SQL) exists.
+// @RestController
 @RequestMapping("/api/pod")
 @RequiredArgsConstructor
 @Slf4j
