@@ -40,13 +40,14 @@ public class DriverServiceImpl
                     "Driver already exists");
         }
 
-        if (dto.getUsername() != null && !dto.getUsername().isBlank()
-                && repository.existsByUsername(dto.getUsername())) {
-            throw new RuntimeException("Username already in use");
-        }
-
         Driver entity =
                 mapToEntity(dto);
+
+        // Username always mirrors Driver ID — driverId is already the
+        // unique primary key, so this is guaranteed unique too, no
+        // separate check needed. Whatever dto.getUsername() said is
+        // ignored/overwritten here.
+        entity.setUsername(entity.getDriverId());
 
         // Hash the password on the way in — mapToEntity() copied the
         // plain-text value via BeanUtils, overwrite it with the hash
@@ -85,17 +86,13 @@ public class DriverServiceImpl
         entity.setActive(dto.getActive());
         entity.setEmployeeCode(dto.getEmployeeCode());
 
-        // Username: update if a new one was given. Password: only
-        // overwrite if a new plain-text value was actually submitted —
-        // an update that doesn't touch the password field shouldn't
-        // wipe the existing one.
-        if (dto.getUsername() != null && !dto.getUsername().isBlank()
-                && !dto.getUsername().equals(entity.getUsername())) {
-            if (repository.existsByUsername(dto.getUsername())) {
-                throw new RuntimeException("Username already in use");
-            }
-            entity.setUsername(dto.getUsername());
-        }
+        // Username always mirrors Driver ID (which can't change on
+        // update — it's the path variable / primary key), so this is
+        // just re-asserting the invariant, not really "updating"
+        // anything. Password: only overwrite if a new plain-text value
+        // was actually submitted — an update that doesn't touch the
+        // password field shouldn't wipe the existing one.
+        entity.setUsername(entity.getDriverId());
         if (dto.getPassword() != null && !dto.getPassword().isBlank()) {
             entity.setPassword(passwordEncoder.encode(dto.getPassword()));
         }
