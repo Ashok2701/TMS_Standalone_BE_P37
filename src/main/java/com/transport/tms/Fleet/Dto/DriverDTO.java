@@ -14,6 +14,14 @@ public class DriverDTO {
 
     private String driverName;
 
+    // POD login credentials. username is safe to return in responses;
+    // password is write-only — DriverServiceImpl.mapToDTO() explicitly
+    // clears it before returning any Driver, so a hash never reaches
+    // the frontend. Leave blank on update to keep the existing password.
+    private String username;
+
+    private String password;
+
     private Boolean active;
 
     private String employeeCode;

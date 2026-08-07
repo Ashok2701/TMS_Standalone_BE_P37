@@ -74,6 +74,10 @@ public class SecurityConfig {
                                 "/api/v1/auth/login")
                         .permitAll()
 
+                        .requestMatchers(
+                                "/api/pod/auth/login")
+                        .permitAll()
+
                         .anyRequest()
                         .permitAll()
                 );

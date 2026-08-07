@@ -21,6 +21,14 @@ public class Driver {
     @Column(name = "driver_name")
     private String driverName;
 
+    // POD app login credentials — used for driver authentication,
+    // separate from the xr_users/XRAuth system used by the web app.
+    @Column(name = "username", unique = true)
+    private String username;
+
+    @Column(name = "password")
+    private String password;   // BCrypt hash — never serialized back out, see DriverServiceImpl.mapToDTO()
+
     @Column(name = "site_code")
     private String site;          // site (xr_site.site_code)
 

@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -26,6 +27,7 @@ public class DriverServiceImpl
         implements DriverService {
 
     private final DriverRepository repository;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     public DriverDTO create(
@@ -38,8 +40,22 @@ public class DriverServiceImpl
                     "Driver already exists");
         }
 
+        if (dto.getUsername() != null && !dto.getUsername().isBlank()
+                && repository.existsByUsername(dto.getUsername())) {
+            throw new RuntimeException("Username already in use");
+        }
+
         Driver entity =
                 mapToEntity(dto);
+
+        // Hash the password on the way in — mapToEntity() copied the
+        // plain-text value via BeanUtils, overwrite it with the hash
+        // before it's ever saved.
+        if (dto.getPassword() != null && !dto.getPassword().isBlank()) {
+            entity.setPassword(passwordEncoder.encode(dto.getPassword()));
+        } else {
+            entity.setPassword(null);
+        }
 
         entity.setCreatedAt(
                 LocalDateTime.now());
@@ -68,6 +84,21 @@ public class DriverServiceImpl
         entity.setDriverName(dto.getDriverName());
         entity.setActive(dto.getActive());
         entity.setEmployeeCode(dto.getEmployeeCode());
+
+        // Username: update if a new one was given. Password: only
+        // overwrite if a new plain-text value was actually submitted —
+        // an update that doesn't touch the password field shouldn't
+        // wipe the existing one.
+        if (dto.getUsername() != null && !dto.getUsername().isBlank()
+                && !dto.getUsername().equals(entity.getUsername())) {
+            if (repository.existsByUsername(dto.getUsername())) {
+                throw new RuntimeException("Username already in use");
+            }
+            entity.setUsername(dto.getUsername());
+        }
+        if (dto.getPassword() != null && !dto.getPassword().isBlank()) {
+            entity.setPassword(passwordEncoder.encode(dto.getPassword()));
+        }
         entity.setDateOfBirth(dto.getDateOfBirth());
         entity.setMobileNo(dto.getMobileNo());
         entity.setAlternateMobile(dto.getAlternateMobile());
@@ -152,6 +183,11 @@ public class DriverServiceImpl
     private DriverDTO mapToDTO(Driver entity) {
         DriverDTO dto = new DriverDTO();
         BeanUtils.copyProperties(entity, dto);
+        // BeanUtils.copyProperties is a blind field-name copy — it would
+        // otherwise happily copy the bcrypt hash straight into every API
+        // response (GET /api/drivers, etc.). username is fine to expose;
+        // password never should be.
+        dto.setPassword(null);
         // Image: encode binary → Base64
         if (entity.getDriverImage() != null && entity.getDriverImage().length > 0) {
             dto.setImage("data:image/jpeg;base64,"
