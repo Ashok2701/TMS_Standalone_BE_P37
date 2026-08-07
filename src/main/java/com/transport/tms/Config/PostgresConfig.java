@@ -33,7 +33,8 @@ import java.util.Map;
                 "com.transport.tms.Configuration.Document.Repository",
                 "com.transport.tms.RoutePlanner.Repository",
                 "com.transport.tms.Trip.Repository",
-                "com.transport.tms.Reports.Repository"
+                "com.transport.tms.Reports.Repository",
+                "com.transport.tms.Pod.Repository"
         },
         entityManagerFactoryRef = "postgresEntityManagerFactory",
         transactionManagerRef = "postgresTransactionManager"
@@ -88,7 +89,8 @@ public class PostgresConfig {
                         "com.transport.tms.Configuration.Document.Entity",
                         "com.transport.tms.RoutePlanner.Repository",
                         "com.transport.tms.Trip.Entity",               // XrTrip @Entity
-                        "com.transport.tms.Reports.Entity"
+                        "com.transport.tms.Reports.Entity",
+                        "com.transport.tms.Pod.Entity"                 // ProofOfDelivery @Entity
                 )
                 .persistenceUnit("postgres")
                 .properties(properties)
