@@ -1,5 +1,6 @@
 package com.transport.tms.Config;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -9,12 +10,16 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 
 import java.util.List;
 
 @Configuration
+@RequiredArgsConstructor
 public class SecurityConfig {
+
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(
@@ -78,9 +83,29 @@ public class SecurityConfig {
                                 "/api/pod/auth/login")
                         .permitAll()
 
+                        // Real enforcement, scoped deliberately narrow for
+                        // now: everything ELSE under /api/pod/** requires a
+                        // valid token (checked by JwtAuthenticationFilter
+                        // below). No other /api/pod/** endpoint exists yet
+                        // — this is forward-looking for the next POD
+                        // service (trips/stops/POD submission), so it's
+                        // enforced correctly from the moment it's built
+                        // rather than retrofitted later. Every OTHER
+                        // existing endpoint in the app is untouched
+                        // (anyRequest().permitAll() below, same as before)
+                        // to avoid breaking anything that isn't part of
+                        // this POD work.
+                        .requestMatchers(
+                                "/api/pod/**")
+                        .authenticated()
+
                         .anyRequest()
                         .permitAll()
-                );
+                )
+
+                .addFilterBefore(
+                        jwtAuthenticationFilter,
+                        UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
