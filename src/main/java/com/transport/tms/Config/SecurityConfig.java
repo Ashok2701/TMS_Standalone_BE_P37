@@ -20,6 +20,7 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final ApiAuthenticationEntryPoint apiAuthenticationEntryPoint;
 
     @Bean
     public SecurityFilterChain securityFilterChain(
@@ -63,6 +64,8 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
 
                 .logout(AbstractHttpConfigurer::disable)
+
+                .exceptionHandling(ex -> ex.authenticationEntryPoint(apiAuthenticationEntryPoint))
 
                 .authorizeHttpRequests(auth -> auth
 
