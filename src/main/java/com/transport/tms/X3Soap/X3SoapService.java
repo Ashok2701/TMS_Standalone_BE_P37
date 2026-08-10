@@ -60,6 +60,18 @@ public class X3SoapService {
         return call("X10CSTKMTV", inputXml);
     }
 
+    /** XX10CVTLOC — Create/register a vehicle's location in X3
+     *  (input: I_XFCY = site/facility code, I_VEHLOC = vehicle code).
+     *  Response includes O_XSTATUS (2 = success) and O_XMESS (a message,
+     *  e.g. "Location created for TRL009"). */
+    public Map<String, Object> createVehicleLocation(String xfcy, String vehLoc) {
+        String inputXml = "<PARAM>"
+                + "<FLD NAME=\"I_XFCY\" TYPE=\"Char\">" + xfcy + "</FLD>"
+                + "<FLD NAME=\"I_VEHLOC\" TYPE=\"Char\">" + vehLoc + "</FLD>"
+                + "</PARAM>";
+        return call("XX10CVTLOC", inputXml);
+    }
+
     /** X1CROUTDET — Get route/trip detail */
     public Map<String, Object> getRouteDetail(String vrNum) {
         String inputXml = "<PARAM><FLD NAME=\"I_XROUTE\" TYPE=\"Char\">" + vrNum + "</FLD></PARAM>";

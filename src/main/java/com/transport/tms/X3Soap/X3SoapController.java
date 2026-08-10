@@ -37,6 +37,14 @@ public class X3SoapController {
         return soapService.loadTruck(lvsNum);
     }
 
+    /** Create/register a vehicle's location in X3 — XX10CVTLOC */
+    @PostMapping("/vehicle-location")
+    public Map<String, Object> createVehicleLocation(
+            @RequestParam String xfcy,
+            @RequestParam String vehLoc) {
+        return soapService.createVehicleLocation(xfcy, vehLoc);
+    }
+
     /** Get route/trip detail — X1CROUTDET */
     @GetMapping("/route-detail")
     public Map<String, Object> getRouteDetail(@RequestParam String vrNum) {
