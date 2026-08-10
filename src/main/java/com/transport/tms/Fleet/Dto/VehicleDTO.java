@@ -34,6 +34,7 @@ public class VehicleDTO {
     private String     site;
     private String     departureSite;
     private String     arrivalSite;
+    private String     location;      // X3 vehicle location code (XX10CVTLOC)
     private String     arrivalDeparture;
 
     // Timing

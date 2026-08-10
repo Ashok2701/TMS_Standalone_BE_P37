@@ -71,6 +71,9 @@ public class Vehicle {
     @Column(name = "end_depot")
     private String arrivalSite;          // arrival site/site
 
+    @Column(name = "location")
+    private String location;          // X3 vehicle location code (XX10CVTLOC)
+
     @Column(name = "arrival_departure")
     private String arrivalDeparture;  // arrival/departure config
 

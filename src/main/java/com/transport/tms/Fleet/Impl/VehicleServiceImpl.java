@@ -125,6 +125,7 @@ public class VehicleServiceImpl implements VehicleService {
         e.setDepartureSite(dto.getDepartureSite());
         e.setArrivalSite(dto.getArrivalSite());
         e.setArrivalDeparture(dto.getArrivalDeparture());
+        e.setLocation(dto.getLocation());
 
         // Timing
         e.setEarliestStartTime(dto.getEarliestStartTime());
@@ -223,6 +224,7 @@ public class VehicleServiceImpl implements VehicleService {
         dto.setDepartureSite(e.getDepartureSite());
         dto.setArrivalSite(e.getArrivalSite());
         dto.setArrivalDeparture(e.getArrivalDeparture());
+        dto.setLocation(e.getLocation());
 
         dto.setEarliestStartTime(e.getEarliestStartTime());
         dto.setMaxTotalTime(e.getMaxTotalTime());
