@@ -41,8 +41,9 @@ public class X3SoapController {
     @PostMapping("/vehicle-location")
     public Map<String, Object> createVehicleLocation(
             @RequestParam String xfcy,
-            @RequestParam String vehLoc) {
-        return soapService.createVehicleLocation(xfcy, vehLoc);
+            @RequestParam String vehLoc,
+            @RequestParam(defaultValue = "1") String xTypeFlg) {
+        return soapService.createVehicleLocation(xfcy, vehLoc, xTypeFlg);
     }
 
     /** Get route/trip detail — X1CROUTDET */
