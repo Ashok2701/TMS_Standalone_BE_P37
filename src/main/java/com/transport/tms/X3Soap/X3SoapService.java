@@ -66,13 +66,17 @@ public class X3SoapService {
     }
 
     /** XX10CVTLOC — Create/register a vehicle's location in X3
-     *  (input: I_XFCY = site/facility code, I_VEHLOC = vehicle code,
+     *  (input: I_XFCY = site/facility code, I_XVEHLOC = vehicle code,
      *  I_XTYPEFLG = location type flag, e.g. "1"). Response includes
-     *  O_XSTATUS (2 = success) and O_XMESS (a message). */
+     *  O_XSTATUS (2 = success) and O_XMESS (a message).
+     *  BUG FIX: was sending I_VEHLOC (no "X") — X3 silently ignored
+     *  that unrecognized field name and its own I_XVEHLOC stayed empty,
+     *  which is exactly what came back in the response
+     *  (i_xvehloc: "") even though the call reported success. */
     public Map<String, Object> createVehicleLocation(String xfcy, String vehLoc, String xTypeFlg) {
         String inputXml = "<PARAM>"
                 + "<FLD NAME=\"I_XFCY\" TYPE=\"Char\">" + xfcy + "</FLD>"
-                + "<FLD NAME=\"I_VEHLOC\" TYPE=\"Char\">" + vehLoc + "</FLD>"
+                + "<FLD NAME=\"I_XVEHLOC\" TYPE=\"Char\">" + vehLoc + "</FLD>"
                 + "<FLD NAME=\"I_XTYPEFLG\" TYPE=\"Char\">" + (xTypeFlg != null && !xTypeFlg.isBlank() ? xTypeFlg : "1") + "</FLD>"
                 + "</PARAM>";
         return call("XX10CVTLOC", inputXml);
