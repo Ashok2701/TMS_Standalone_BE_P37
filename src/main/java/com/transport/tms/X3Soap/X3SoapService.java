@@ -6,6 +6,11 @@ import org.w3c.dom.*;
 import org.xml.sax.InputSource;
 
 import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
 import javax.net.ssl.*;
 import java.io.*;
 import java.net.HttpURLConnection;
@@ -152,12 +157,38 @@ public class X3SoapService {
     // ═══════════════════════════════════════════════════════════
     public Map<String, Object> call(String publicName, String inputXml) {
         try {
+            log.info("X3 SOAP request -> publicName=[{}] url=[{}]\ninputXml:\n{}",
+                    publicName, soapUrl, prettyPrintXml(inputXml));
+
             String envelope = buildEnvelope(publicName, inputXml);
             String response = sendSoap(envelope);
+
+            log.info("X3 SOAP response <- publicName=[{}]\n{}", publicName, response);
+
             return parseResponse(response);
         } catch (Exception e) {
             log.error("X3 SOAP call failed [{}]: {}", publicName, e.getMessage());
             return Map.of("error", e.getMessage(), "publicName", publicName);
+        }
+    }
+
+    /** Best-effort indented XML for readable console output — falls back
+     *  to the raw string unchanged if it isn't parseable (never blocks
+     *  the actual call over a logging convenience). */
+    private String prettyPrintXml(String xml) {
+        try {
+            Document doc = DocumentBuilderFactory.newInstance()
+                    .newDocumentBuilder()
+                    .parse(new InputSource(new StringReader(xml)));
+            Transformer transformer = TransformerFactory.newInstance().newTransformer();
+            transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+            transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "2");
+            transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes");
+            StringWriter writer = new StringWriter();
+            transformer.transform(new DOMSource(doc), new StreamResult(writer));
+            return writer.toString();
+        } catch (Exception e) {
+            return xml;
         }
     }
 
