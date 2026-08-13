@@ -165,6 +165,11 @@ public class UserServiceImpl
 
         user.setFullName(dto.getFullName());
 
+        // password is optional on update — only touch it if the client actually sent one
+        if (dto.getPassword() != null && !dto.getPassword().isBlank()) {
+            user.setPassword(passwordEncoder.encode(dto.getPassword()));
+        }
+
         user.setEmail(dto.getEmail());
 
         user.setMobileNo(dto.getMobileNo());
