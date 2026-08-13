@@ -85,6 +85,7 @@ public class DriverServiceImpl
         entity.setDriverName(dto.getDriverName());
         entity.setActive(dto.getActive());
         entity.setEmployeeCode(dto.getEmployeeCode());
+        entity.setSite(dto.getSite());
 
         // Username always mirrors Driver ID (which can't change on
         // update — it's the path variable / primary key), so this is

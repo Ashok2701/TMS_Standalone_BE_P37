@@ -24,6 +24,8 @@ public class DriverDTO {
 
     private Boolean active;
 
+    private String site;
+
     private String employeeCode;
 
     private LocalDate dateOfBirth;
