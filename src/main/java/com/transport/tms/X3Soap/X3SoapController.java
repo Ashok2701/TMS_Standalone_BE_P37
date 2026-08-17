@@ -109,4 +109,10 @@ public class X3SoapController {
     public Map<String, Object> deleteDocuments(@RequestBody List<String> docNums) {
         return soapService.deleteDocuments(docNums);
     }
+
+    /** Confirm a batch of documents (LVS Confirm) — XX10CRESDH */
+    @PostMapping("/confirm-deliveries")
+    public Map<String, Object> confirmDeliveries(@RequestBody List<String> docNums) {
+        return soapService.confirmDeliveries(docNums);
+    }
 }

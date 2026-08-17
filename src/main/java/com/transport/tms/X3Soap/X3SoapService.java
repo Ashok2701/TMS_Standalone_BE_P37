@@ -74,6 +74,26 @@ public class X3SoapService {
         return call("XX10CDOCUP", xml.toString());
     }
 
+    /** XX10CRESDH — confirm a batch of documents (pick tickets), each
+     *  creating a delivery in X3. Called for "LVS Confirm". Same TAB/LIN
+     *  table structure as deleteDocuments()/updateDocuments(), but each
+     *  row only needs I_XPRHNUM. Response is per-document: TAB/LIN with
+     *  I_XPRHNUM (echoed), O_XSTATUS, O_XMESS (e.g. "Delivery created
+     *  SHP110010021") — parseXmlToMap() already returns this correctly
+     *  as an array under the lowercased TAB ID (e.g. "grp1"), so no
+     *  special response handling is needed here. */
+    public Map<String, Object> confirmDeliveries(List<String> docNums) {
+        StringBuilder lines = new StringBuilder();
+        for (int i = 0; i < docNums.size(); i++) {
+            lines.append("<LIN NUM=\"").append(i + 1).append("\">")
+                 .append("<FLD NAME=\"I_XPRHNUM\">").append(nz(docNums.get(i))).append("</FLD>")
+                 .append("</LIN>");
+        }
+        String inputXml = "<PARAM><TAB DIM=\"9999\" ID=\"GRP1\" SIZE=\"" + docNums.size() + "\">"
+            + lines + "</TAB></PARAM>";
+        return call("XX10CRESDH", inputXml);
+    }
+
     private String nz(String s) { return s != null ? s : ""; }
 
     /** X10CCONBUT — Confirm/validate LVS in X3 */
