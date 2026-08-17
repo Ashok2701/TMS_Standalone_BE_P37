@@ -47,6 +47,35 @@ public class X3SoapService {
     // PUBLIC SERVICE METHODS
     // ═══════════════════════════════════════════════════════════
 
+    /** XX10CDOCUP — bulk-update vehicle/driver/sequence/status/trailer/date
+     *  for every document (stop) in a trip. Called on Lock. Unlike every
+     *  other call here, the input is a TABLE (TAB/LIN), not flat FLD — one
+     *  LIN row per document. SIZE on the TAB element is the actual number
+     *  of rows; DIM="9999" is X3's declared max-rows convention, not the
+     *  real count.
+     *  Each row map expects: docNum, vehNum, driverId, seq, status,
+     *  trailer, trDate (trDate as YYYYMMDD, e.g. "20261108"). */
+    public Map<String, Object> updateDocuments(List<Map<String, String>> rows) {
+        StringBuilder xml = new StringBuilder();
+        xml.append("<PARAM><TAB DIM=\"9999\" ID=\"GRP1\" SIZE=\"").append(rows.size()).append("\">");
+        int lineNum = 1;
+        for (Map<String, String> row : rows) {
+            xml.append("<LIN NUM=\"").append(lineNum++).append("\">");
+            xml.append("<FLD NAME=\"I_XPRHNUM\">").append(nz(row.get("docNum"))).append("</FLD>");
+            xml.append("<FLD NAME=\"I_XVEHNUM\">").append(nz(row.get("vehNum"))).append("</FLD>");
+            xml.append("<FLD NAME=\"I_XDRIVERID\">").append(nz(row.get("driverId"))).append("</FLD>");
+            xml.append("<FLD NAME=\"I_XSEQ\">").append(nz(row.get("seq"))).append("</FLD>");
+            xml.append("<FLD NAME=\"I_XSTATUS\">").append(nz(row.get("status"))).append("</FLD>");
+            xml.append("<FLD NAME=\"I_XTRL\">").append(nz(row.get("trailer"))).append("</FLD>");
+            xml.append("<FLD NAME=\"I_XTRDATE\">").append(nz(row.get("trDate"))).append("</FLD>");
+            xml.append("</LIN>");
+        }
+        xml.append("</TAB></PARAM>");
+        return call("XX10CDOCUP", xml.toString());
+    }
+
+    private String nz(String s) { return s != null ? s : ""; }
+
     /** X10CCONBUT — Confirm/validate LVS in X3 */
     public Map<String, Object> confirmLvs(String lvsNum) {
         String inputXml = "<PARAM><FLD NAME=\"I_XLVSNUM\" TYPE=\"Char\">" + lvsNum + "</FLD></PARAM>";

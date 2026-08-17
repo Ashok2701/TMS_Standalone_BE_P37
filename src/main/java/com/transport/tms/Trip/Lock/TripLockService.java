@@ -2,6 +2,8 @@ package com.transport.tms.Trip.Lock;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.transport.tms.Config.SchemaConfig;
+import com.transport.tms.Fleet.Entity.Vehicle;
+import com.transport.tms.Fleet.Repository.VehicleRepository;
 import com.transport.tms.Trip.Entity.XrTrip;
 import com.transport.tms.Trip.Lock.Entity.LvsHeader;
 import com.transport.tms.Trip.Lock.Entity.VrDetail;
@@ -10,6 +12,7 @@ import com.transport.tms.Trip.Lock.Repository.LvsHeaderRepository;
 import com.transport.tms.Trip.Lock.Repository.VrDetailRepository;
 import com.transport.tms.Trip.Lock.Repository.VrHeaderRepository;
 import com.transport.tms.Trip.Repository.TripRepository;
+import com.transport.tms.X3Soap.X3SoapService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -19,6 +22,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -28,7 +34,8 @@ import java.util.Map;
  * tables have been replaced by xr_vrheader/xr_vrdetails/xr_lvsheader on
  * Postgres. TMS owns this data completely now; X3 SQL Server is only
  * still touched here for SDELIVERY/STOPREH (the actual delivery/pickup
- * documents, which remain X3's own data).
+ * documents, which remain X3's own data), and the XX10CDOCUP SOAP call
+ * (vehicle/driver/sequence/status/trailer/date per document) on Lock.
  */
 @Slf4j
 @Service
@@ -38,6 +45,8 @@ public class TripLockService {
     private final VrHeaderRepository   vrHeaderRepository;
     private final VrDetailRepository   vrDetailRepository;
     private final LvsHeaderRepository  lvsHeaderRepository;
+    private final VehicleRepository    vehicleRepository;
+    private final X3SoapService        x3SoapService;
     private final SchemaConfig         schemas;
     private final ObjectMapper         objectMapper;
     private final JdbcTemplate         sqlServerJdbc;
@@ -47,6 +56,8 @@ public class TripLockService {
             VrHeaderRepository vrHeaderRepository,
             VrDetailRepository vrDetailRepository,
             LvsHeaderRepository lvsHeaderRepository,
+            VehicleRepository vehicleRepository,
+            X3SoapService x3SoapService,
             SchemaConfig schemas,
             ObjectMapper objectMapper,
             @Qualifier("sqlServerJdbcTemplate") JdbcTemplate sqlServerJdbc) {
@@ -54,6 +65,8 @@ public class TripLockService {
         this.vrHeaderRepository  = vrHeaderRepository;
         this.vrDetailRepository  = vrDetailRepository;
         this.lvsHeaderRepository = lvsHeaderRepository;
+        this.vehicleRepository   = vehicleRepository;
+        this.x3SoapService       = x3SoapService;
         this.schemas             = schemas;
         this.objectMapper        = objectMapper;
         this.sqlServerJdbc       = sqlServerJdbc;
@@ -63,6 +76,7 @@ public class TripLockService {
     @Transactional
     public void lockTrip(String tripCode, String userCode) {
         XrTrip trip = findTrip(tripCode);
+
         if (trip.getLockFlag() != null && trip.getLockFlag() == 1)
             throw new RuntimeException("Trip already locked: " + tripCode);
 
@@ -70,7 +84,18 @@ public class TripLockService {
         writeVrHeader(trip, userCode);
         writeVrDetails(trip, userCode);
 
-        // 2. Postgres — trip status itself
+        // 2. XX10CDOCUP — push vehicle/driver/sequence/status/trailer/date
+        //    to X3 for every document on this trip. Non-blocking: an X3
+        //    rejection here shouldn't undo the lock that already
+        //    succeeded on our own side (same pattern as every other X3
+        //    call in this codebase).
+        try {
+            updateDocumentsInX3(trip);
+        } catch (Exception e) {
+            log.error("XX10CDOCUP failed for {}: {}", tripCode, e.getMessage());
+        }
+
+        // 3. Postgres — trip status itself
         trip.setOptiStatus("Locked");
         trip.setLockFlag(1);
         trip.setDatExec(OffsetDateTime.now());
@@ -229,6 +254,61 @@ public class TripLockService {
             }
         }
         log.info("xr_vrdetails: {} rows written for {}", stops.size(), trip.getTripCode());
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // XX10CDOCUP — one row per document/stop, sent to X3 on Lock
+    // ═══════════════════════════════════════════════════════════
+    @SuppressWarnings("unchecked")
+    private void updateDocumentsInX3(XrTrip trip) {
+        if (trip.getStopObjectsJson() == null || trip.getStopObjectsJson().isBlank()) return;
+
+        List<Map<String, Object>> stops;
+        try {
+            stops = objectMapper.readValue(trip.getStopObjectsJson(),
+                objectMapper.getTypeFactory().constructCollectionType(List.class, Map.class));
+        } catch (Exception e) {
+            log.error("Cannot parse stops for XX10CDOCUP {}: {}", trip.getTripCode(), e.getMessage());
+            return;
+        }
+        if (stops.isEmpty()) return;
+
+        // Trailer comes from the vehicle assigned to this trip, not the
+        // trip itself — XrTrip has no trailer field of its own.
+        String trailer = "";
+        if (trip.getVehicleCode() != null) {
+            Vehicle v = vehicleRepository.findById(trip.getVehicleCode()).orElse(null);
+            if (v != null && v.getTrailerNumber() != null) trailer = v.getTrailerNumber();
+        }
+
+        LocalDate docDate = trip.getDocDate() != null ? trip.getDocDate() : LocalDate.now();
+        String trDate = docDate.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+
+        List<Map<String, String>> rows = new ArrayList<>();
+        int seq = 1;
+        for (Map<String, Object> s : stops) {
+            String docNum = getString(s, "txn", "docNum", "id");
+            if (docNum == null) { seq++; continue; }
+
+            Map<String, String> row = new LinkedHashMap<>();
+            row.put("docNum", docNum);
+            row.put("vehNum", trip.getVehicleCode());
+            row.put("driverId", trip.getDriverId());
+            row.put("seq", String.valueOf(seq));
+            row.put("status", "1");
+            row.put("trailer", trailer);
+            row.put("trDate", trDate);
+            rows.add(row);
+            seq++;
+        }
+        if (rows.isEmpty()) return;
+
+        Map<String, Object> resp = x3SoapService.updateDocuments(rows);
+        if (resp != null && resp.get("error") != null) {
+            log.error("XX10CDOCUP error for {}: {}", trip.getTripCode(), resp.get("error"));
+        } else {
+            log.info("XX10CDOCUP: {} document(s) updated in X3 for {}", rows.size(), trip.getTripCode());
+        }
     }
 
     private LocalDateTime parseDateTime(String date, String time) {
