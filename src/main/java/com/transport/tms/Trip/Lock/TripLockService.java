@@ -3,37 +3,60 @@ package com.transport.tms.Trip.Lock;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.transport.tms.Config.SchemaConfig;
 import com.transport.tms.Trip.Entity.XrTrip;
+import com.transport.tms.Trip.Lock.Entity.LvsHeader;
+import com.transport.tms.Trip.Lock.Entity.VrDetail;
+import com.transport.tms.Trip.Lock.Entity.VrHeader;
+import com.transport.tms.Trip.Lock.Repository.LvsHeaderRepository;
+import com.transport.tms.Trip.Lock.Repository.VrDetailRepository;
+import com.transport.tms.Trip.Lock.Repository.VrHeaderRepository;
 import com.transport.tms.Trip.Repository.TripRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Lock / Validate / Unlock. As of this version, XX10CPLANCHA/XX10CPLANCHD/
+ * XX10CLODSTOH (X3 SQL Server) are no longer written to at all — those
+ * tables have been replaced by xr_vrheader/xr_vrdetails/xr_lvsheader on
+ * Postgres. TMS owns this data completely now; X3 SQL Server is only
+ * still touched here for SDELIVERY/STOPREH (the actual delivery/pickup
+ * documents, which remain X3's own data).
+ */
 @Slf4j
 @Service
 public class TripLockService {
 
-    private final TripRepository tripRepository;
-    private final SchemaConfig   schemas;
-    private final ObjectMapper   objectMapper;
-    private final JdbcTemplate   sqlServerJdbc;
+    private final TripRepository       tripRepository;
+    private final VrHeaderRepository   vrHeaderRepository;
+    private final VrDetailRepository   vrDetailRepository;
+    private final LvsHeaderRepository  lvsHeaderRepository;
+    private final SchemaConfig         schemas;
+    private final ObjectMapper         objectMapper;
+    private final JdbcTemplate         sqlServerJdbc;
 
     public TripLockService(
             TripRepository tripRepository,
+            VrHeaderRepository vrHeaderRepository,
+            VrDetailRepository vrDetailRepository,
+            LvsHeaderRepository lvsHeaderRepository,
             SchemaConfig schemas,
             ObjectMapper objectMapper,
             @Qualifier("sqlServerJdbcTemplate") JdbcTemplate sqlServerJdbc) {
-        this.tripRepository = tripRepository;
-        this.schemas        = schemas;
-        this.objectMapper   = objectMapper;
-        this.sqlServerJdbc  = sqlServerJdbc;
+        this.tripRepository      = tripRepository;
+        this.vrHeaderRepository  = vrHeaderRepository;
+        this.vrDetailRepository  = vrDetailRepository;
+        this.lvsHeaderRepository = lvsHeaderRepository;
+        this.schemas             = schemas;
+        this.objectMapper        = objectMapper;
+        this.sqlServerJdbc       = sqlServerJdbc;
     }
 
     // ── LOCK ─────────────────────────────────────────────────
@@ -43,18 +66,11 @@ public class TripLockService {
         if (trip.getLockFlag() != null && trip.getLockFlag() == 1)
             throw new RuntimeException("Trip already locked: " + tripCode);
 
-        String x3 = schemas.getX3Schema();
+        // 1. xr_vrheader + xr_vrdetails (Postgres — replaces XX10CPLANCHA/XX10CPLANCHD)
+        writeVrHeader(trip, userCode);
+        writeVrDetails(trip, userCode);
 
-        // 1. XX10CPLANCHA + XX10CPLANCHD
-        writePlanningHeader(trip, x3, userCode);
-        writePlanningDetails(trip, x3, userCode);
-
-        // NOTE: XX10TRIPS no longer exists under TMSNEW schema
-        // ("Invalid object name 'TMSNEW.XX10TRIPS'") — removed the
-        // lock/optistatus UPDATE that was failing on every lock.
-        // Postgres (XrTrip.optiStatus/lockFlag) is the source of truth.
-
-        // 2. Postgres
+        // 2. Postgres — trip status itself
         trip.setOptiStatus("Locked");
         trip.setLockFlag(1);
         trip.setDatExec(OffsetDateTime.now());
@@ -71,13 +87,14 @@ public class TripLockService {
 
         String x3 = schemas.getX3Schema();
 
-        // 1. XX10CLODSTOH
-        writeLVSHeader(trip, x3, userCode);
+        // 1. xr_lvsheader (Postgres — replaces XX10CLODSTOH)
+        writeLvsHeader(trip, userCode);
 
-        // 2. SDELIVERY + STOPREH XDLV_STATUS_0 = 2
+        // 2. SDELIVERY + STOPREH XDLV_STATUS_0 = 2 — still X3's own
+        //    delivery/pickup documents, unaffected by this migration.
         updateDocStatusOnValidate(trip, x3);
 
-        // 3. Postgres
+        // 3. Postgres — trip status itself
         trip.setOptiStatus("Validated");
         tripRepository.save(trip);
         log.info("VALIDATED {}", tripCode);
@@ -90,19 +107,11 @@ public class TripLockService {
         if ("Validated".equals(trip.getOptiStatus()))
             throw new RuntimeException("Validated trips cannot be unlocked: " + tripCode);
 
-        String x3 = schemas.getX3Schema();
+        // 1. Delete xr_vrheader + xr_vrdetails (Postgres)
+        vrDetailRepository.deleteByTripCode(tripCode);
+        vrHeaderRepository.findById(tripCode).ifPresent(vrHeaderRepository::delete);
 
-        // 1. Delete planning tables
-        sqlServerJdbc.update("DELETE FROM " + x3 + ".XX10CPLANCHD WHERE XNUMPC_0 = ?", tripCode);
-        sqlServerJdbc.update("DELETE FROM " + x3 + ".XX10CPLANCHA WHERE XNUMPC_0 = ?", tripCode);
-
-        // NOTE: XX10TRIPS no longer exists under TMSNEW — removed the
-        // lock/optistatus UPDATE that was failing on every unlock.
-        // Postgres is the sole source of truth for optiStatus/lockFlag;
-        // unlock takes a Locked trip back to "Optimised" there (it was
-        // already optimised via VROOM before being locked).
-
-        // 2. Postgres
+        // 2. Postgres — trip status itself
         trip.setOptiStatus("Optimised");
         trip.setLockFlag(0);
         tripRepository.save(trip);
@@ -126,166 +135,35 @@ public class TripLockService {
     }
 
     // ═══════════════════════════════════════════════════════════
-    // XX10CPLANCHA — exact schema
+    // xr_vrheader — replaces XX10CPLANCHA
     // ═══════════════════════════════════════════════════════════
-    private void writePlanningHeader(XrTrip trip, String x3, String userCode) {
-        sqlServerJdbc.update("DELETE FROM " + x3 + ".XX10CPLANCHA WHERE XNUMPC_0 = ?", trip.getTripCode());
+    private void writeVrHeader(XrTrip trip, String userCode) {
+        LocalDateTime now = LocalDateTime.now();
+        String usr = normalizeUser(userCode);
 
-        LocalDateTime now     = LocalDateTime.now();
-        String hhmm           = now.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"));
-        String emptyStr       = "";
-        byte[] emptyUuid      = new byte[16];
-        String usr5           = userCode != null && userCode.length() > 5 ? userCode.substring(0,5) : (userCode != null ? userCode : "SYS");
-        String veh            = trip.getVehicleCode() != null ? trip.getVehicleCode() : emptyStr;
-        String site           = trip.getSite()        != null ? trip.getSite()        : emptyStr;
-        String driverId       = trip.getDriverId()    != null ? trip.getDriverId()    : emptyStr;
-        String startTime      = trip.getStartTime()   != null ? trip.getStartTime()   : emptyStr;
-        String endTime        = trip.getEndTime()     != null ? trip.getEndTime()     : emptyStr;
-        String arrSite        = trip.getArrSite()     != null ? trip.getArrSite()     : emptyStr;
-        double totDist        = parseDoubleSafe(trip.getTotalDistance());
-        double totTime        = parseDoubleSafe(trip.getTotalTime());
-        java.time.LocalDate docDate = trip.getDocDate() != null ? trip.getDocDate() : java.time.LocalDate.now();
-        LocalDateTime docDateDt = docDate.atStartOfDay();
+        VrHeader h = vrHeaderRepository.findById(trip.getTripCode()).orElseGet(VrHeader::new);
+        boolean isNew = h.getCreatedAt() == null;
 
-        // XEQUIPID_0 .. XEQUIPID_98 = 99 empty strings
-        String[] emptyEquip = new String[99];
-        java.util.Arrays.fill(emptyEquip, emptyStr);
+        h.setTripCode(trip.getTripCode());
+        h.setVehicleCode(trip.getVehicleCode());
+        h.setDriverId(trip.getDriverId());
+        h.setSite(trip.getSite());
+        h.setArrSite(trip.getArrSite());
+        h.setStartTime(trip.getStartTime());
+        h.setEndTime(trip.getEndTime());
+        h.setDocDate(trip.getDocDate() != null ? trip.getDocDate() : LocalDate.now());
+        h.setTotalDistance(parseDoubleSafe(trip.getTotalDistance()));
+        h.setTotalTime(parseDoubleSafe(trip.getTotalTime()));
+        h.setTotalCost(trip.getTotalCost());
+        h.setTravelTime(trip.getTravelTime());
+        h.setTotalCases(computeTotalCases(trip));
+        h.setStatus(1);
+        if (isNew) { h.setCreatedAt(now); h.setCreatedBy(usr); }
+        h.setUpdatedAt(now);
+        h.setUpdatedBy(usr);
 
-        int totalCases = computeTotalCases(trip);
-
-        // Build column list
-        StringBuilder cols = new StringBuilder(
-            "UPDTICK_0,XNUMPC_0,BPTNUM_0,CODEYVE_0,XCODEYVE_0,HEUDEP_0,"
-            + "CREDAT_0,CREUSR_0,UPDUSR_0,UPDDAT_0,"
-            + "OPTIMSTA_0,FCY_0,XVRY_0,JOBID_0,"
-            + "TOTDISTANCE_0,TOTTIME_0,XNUMTV_0,"
-            + "DATLIV_0,HEUARR_0,CREDATTIM_0,UPDDATTIM_0,AUUID_0,"
-            + "DATARR_0,INSTFDR_0,INSTFCU_0,JOBSTATUS_0,"
-            + "HEUEXEC_0,DATEXEC_0,DISPSTAT_0,XVALID_0,DRIVERID_0,XROUTNBR_0,"
-            + "LASTUPDDAT_0,LASTUPDTIM_0,LASTUPDAUS_0,"
-            + "PICKSTRT_0,CHECKIN_0,LOADINGSTR_0,LOADINGEND_0,CHECKOUT_0,RETURNED_0,"
-            + "ADATLIV_0,AHEUDEP_0,ADATARR_0,AHEUARR_0,"
-            + "LOADBAY_0,MASPRO_0,XFLG_0,XSTKVCR_0,XHELPER_0,XSLMAN_0,XTECHN_0,XUSER_0,"
-            + "XSTATUS_0,XSMSCOUNT_0,XDIFTIME_0,XSMSSENT_0,XSEALNUMH_0,"
-            + "XCIGEOX_0,XCIGEOY_0,XCOGEOX_0,XCOGEOY_0,"
-            + "XUNIT_0,XUNIT1_0,XUNIT2_0,XVOLUME_0,XVOL1_0,XVOL2_0,XVOLU_0,XMASSU_0,XMASSU1_0,XVOLU1_0,"
-            + "POURLOAKG_0,POURLOAM3_0,XDPRTFDR_0,XRTNFDR_0,"
-            + "RHEUDEP_0,RDATLIV_0,RHEUARR_0,RDATARR_0,"
-            + "TRAILER_0,TRAILER_1,XTOTCASES_0,"
-        );
-        // XEQUIPID_0..98
-        for (int i = 0; i <= 98; i++) cols.append("XEQUIPID_").append(i).append(",");
-        cols.append(
-            "XOPERATION_0,XLOADBAY_0,XXSTATUS_0,XTAILGATE_0,XSOURCE_0,XLINKID_0,"
-            + "XSDHPCKSTA_0,XACTDISTCKIN_0,XACTDISTCKOT_0,XOLDCODEYVE_0,"
-            + "DISTANCECOST_0,ORDERCOUNT_0,OVERTIMECOST_0,REGULARTIMEC_0,"
-            + "TOTALCOST_0,TOTALDISTANC_0,TOTALTIME_0,TOTALTRAVELT_0,TOTALBREAKSE_0,"
-            + "RENEWALCOUNT_0,TOTALRENEWAL_0,XDESFCY_0,XTREPORT_0,XALLOCFLG_0,"
-            + "XFLOCTYP_0,XTLOCTYP_0,XFLOC_0,XTLOC_0,NOTE_0"
-        );
-
-        // Build values placeholder
-        int totalCols = 5+4+3+6+4+6+3+6+10+4+4+2+99+6+4+3+8+6+2+6+4;
-        // easier: count manually from params list below
-        String placeholders = String.join(",", java.util.Collections.nCopies(
-            5+4+3+6+4+6+3+6+10+4+4+2+99+6+4+4+8+6+5+2+6+4+8+6, "?"));
-
-        // Build params list
-        java.util.List<Object> params = new java.util.ArrayList<>();
-        // Core fields
-        params.add(0);                    // UPDTICK_0
-        params.add(trip.getTripCode());   // XNUMPC_0
-        params.add(emptyStr);             // BPTNUM_0
-        params.add(veh);                  // CODEYVE_0
-        params.add(veh);                  // XCODEYVE_0
-        params.add(startTime);            // HEUDEP_0
-        // Audit
-        params.add(now); params.add(usr5); params.add(usr5); params.add(now);
-        // Status/IDs
-        params.add(1);                    // OPTIMSTA_0 = 1
-        params.add(site);                 // FCY_0
-        params.add(1);                    // XVRY_0 = 1 (Scheduled)
-        params.add(emptyStr);             // JOBID_0
-        // Distance/time
-        params.add(totDist);              // TOTDISTANCE_0
-        params.add(totTime);              // TOTTIME_0
-        params.add(emptyStr);             // XNUMTV_0
-        // Date/time fields
-        params.add(docDateDt);            // DATLIV_0
-        params.add(endTime);              // HEUARR_0
-        params.add(now); params.add(now); // CREDATTIM_0, UPDDATTIM_0
-        params.add(emptyUuid);            // AUUID_0
-        params.add(docDateDt);            // DATARR_0
-        params.add(emptyStr); params.add(emptyStr); // INSTFDR_0, INSTFCU_0
-        params.add(emptyStr);             // JOBSTATUS_0
-        params.add(hhmm);                 // HEUEXEC_0
-        params.add(now);                  // DATEXEC_0
-        params.add(1);                    // DISPSTAT_0 = 1
-        params.add(1);                    // XVALID_0 = 1
-        params.add(driverId);             // DRIVERID_0
-        params.add(0);                    // XROUTNBR_0
-        // LASTUPD
-        params.add(now); params.add(hhmm); params.add(usr5);
-        // Status strings
-        params.add(emptyStr); params.add(emptyStr); params.add(emptyStr);
-        params.add(emptyStr); params.add(emptyStr); params.add(emptyStr);
-        // Actual dates (same as planned initially)
-        params.add(docDateDt); params.add(startTime); params.add(docDateDt); params.add(endTime);
-        // Misc
-        params.add(0);                    // LOADBAY_0
-        params.add(0.0);                  // MASPRO_0
-        params.add(0);                    // XFLG_0
-        params.add(emptyStr); params.add(emptyStr); params.add(emptyStr);
-        params.add(emptyStr); params.add(emptyStr); // XHELPER,XSLMAN,XTECHN,XUSER
-        params.add(1);                    // XSTATUS_0 = 1
-        params.add(0); params.add(0); params.add(0); // XSMSCOUNT,XDIFTIME,XSMSSENT
-        params.add(emptyStr);             // XSEALNUMH_0
-        // GEO
-        params.add(emptyStr); params.add(emptyStr); params.add(emptyStr); params.add(emptyStr);
-        // Units
-        params.add(emptyStr); params.add(emptyStr); params.add(emptyStr);
-        params.add(emptyStr); params.add(emptyStr); params.add(emptyStr);
-        params.add(emptyStr); params.add(emptyStr); params.add(emptyStr); params.add(emptyStr);
-        // Load pct
-        params.add(0.0); params.add(0.0);
-        params.add(0); params.add(0);    // XDPRTFDR, XRTNFDR
-        // Return times
-        params.add(emptyStr); params.add(docDateDt); params.add(emptyStr); params.add(docDateDt);
-        // Trailers
-        params.add(emptyStr); params.add(emptyStr);
-        params.add(totalCases);          // XTOTCASES_0 — NOT NULL, sum of stop qty (nbPack)
-        // XEQUIPID_0..98
-        for (int i = 0; i <= 98; i++) params.add(emptyStr);
-        // Tail fields
-        params.add(0); params.add(0);    // XOPERATION_0, XLOADBAY_0
-        params.add(emptyStr);            // XXSTATUS_0
-        params.add(0); params.add(0);   // XTAILGATE_0, XSOURCE_0
-        params.add(emptyStr);            // XLINKID_0
-        params.add(0);                   // XSDHPCKSTA_0
-        params.add(0.0); params.add(0.0); // XACTDISTCKIN_0, XACTDISTCKOT_0
-        params.add(emptyStr);            // XOLDCODEYVE_0
-        // Cost fields
-        params.add(emptyStr);            // DISTANCECOST_0
-        params.add(emptyStr);            // ORDERCOUNT_0
-        params.add(emptyStr);            // OVERTIMECOST_0
-        params.add(emptyStr);            // REGULARTIMEC_0
-        params.add(trip.getTotalCost()     != null ? trip.getTotalCost()     : emptyStr); // TOTALCOST_0
-        params.add(trip.getTotalDistance() != null ? trip.getTotalDistance() : emptyStr); // TOTALDISTANC_0
-        params.add(trip.getTotalTime()     != null ? trip.getTotalTime()     : emptyStr); // TOTALTIME_0
-        params.add(trip.getTravelTime()    != null ? trip.getTravelTime()    : emptyStr); // TOTALTRAVELT_0
-        params.add(emptyStr);            // TOTALBREAKSE_0
-        params.add(emptyStr); params.add(emptyStr); // RENEWALCOUNT_0, TOTALRENEWAL_0
-        params.add(arrSite);             // XDESFCY_0
-        params.add(0); params.add(0);   // XTREPORT_0, XALLOCFLG_0
-        params.add(emptyStr); params.add(emptyStr); // XFLOCTYP_0, XTLOCTYP_0
-        params.add(emptyStr); params.add(emptyStr); // XFLOC_0, XTLOC_0
-        params.add(emptyStr);            // NOTE_0
-
-        String sql = "INSERT INTO " + x3 + ".XX10CPLANCHA (" + cols + ") VALUES ("
-            + String.join(",", java.util.Collections.nCopies(params.size(), "?")) + ")";
-
-        sqlServerJdbc.update(sql, params.toArray());
-        log.info("XX10CPLANCHA written for {}", trip.getTripCode());
+        vrHeaderRepository.save(h);
+        log.info("xr_vrheader written for {}", trip.getTripCode());
     }
 
     private double parseDoubleSafe(String val) {
@@ -294,11 +172,11 @@ public class TripLockService {
     }
 
     // ═══════════════════════════════════════════════════════════
-    // XX10CPLANCHD — exact schema with correct field names
+    // xr_vrdetails — replaces XX10CPLANCHD (one row per stop)
     // ═══════════════════════════════════════════════════════════
     @SuppressWarnings("unchecked")
-    private void writePlanningDetails(XrTrip trip, String x3, String userCode) {
-        sqlServerJdbc.update("DELETE FROM " + x3 + ".XX10CPLANCHD WHERE XNUMPC_0 = ?", trip.getTripCode());
+    private void writeVrDetails(XrTrip trip, String userCode) {
+        vrDetailRepository.deleteByTripCode(trip.getTripCode());
 
         if (trip.getStopObjectsJson() == null || trip.getStopObjectsJson().isBlank()) return;
 
@@ -309,141 +187,48 @@ public class TripLockService {
         } catch (Exception e) { log.error("Cannot parse stops for {}: {}", trip.getTripCode(), e.getMessage()); return; }
 
         LocalDateTime now = LocalDateTime.now();
-        String emptyStr   = "";
-        byte[] emptyUuid  = new byte[16];
-        String usr5       = userCode != null && userCode.length() > 5 ? userCode.substring(0,5) : (userCode != null ? userCode : "SYS");
-
-        String sql = "INSERT INTO " + x3 + ".XX10CPLANCHD ("
-            // Identity / keys
-            + "UPDTICK_0, XNUMPC_0, XLINPC_0, SDHNUM_0, XPICK_SDH_0, XDTYPE_0,"
-            // Audit
-            + "CREDAT_0, CREUSR_0, UPDUSR_0, UPDDAT_0, CREDATTIM_0, UPDDATTIM_0,"
-            // Sequence + distances
-            + "SEQUENCE_0, FROMPREVDIST_0, FROMPREVTRA_0,"
-            // Planned arrival
-            + "ARRIVEDATE_0, AARRIVEDATE_0, ARRIVETIME_0, AARRIVETIME_0,"
-            // Planned departure
-            + "DEPARTDATE_0, ADEPARTDATE_0, DEPARTTIME_0, ADEPARTTIME_0,"
-            // UTC times (same as planned)
-            + "ARRIVEDATEUT_0, ARRIVETIMEUT_0, DEPARTDATEU_0, DEPARTTIMEU_0,"
-            // RAINONAFF (5 slots)
-            + "RAINONAFF_0, RAINONAFF_1, RAINONAFF_2, RAINONAFF_3, RAINONAFF_4,"
-            // Flags
-            + "OPTISTA_0, XLOADED_0, XACTETA_0, XACTETD_0,"
-            + "XSMSFLG_0, XSDHSKIP_0, XDEPFLG_0, XDLV_STATUS_0,"
-            // Measurements
-            + "XMS_0, XVOL_0, SERVICETIME_0, XCALCDIS_0, XWAITTIME_0, XMAXSTAHT_0,"
-            + "SWAITTIME_0, SERVICETIM_0,"
-            // Doc info
-            + "XDOCTYP_0, XPICKUP_DROP_0, XSEALNUM_0, XSKIPRES_0, XACTSEQ_0,"
-            // Return times (empty)
-            + "RDEPARTDATE_0, RDEPARTTIME_0, RARRIVEDATE_0, RARRIVETIME_0,"
-            // Confirm times (empty)
-            + "XCNFARRDATE_0, XCNFARRTIME_0, XCNFDEPDATE_0, XCNFDEPTIME_0,"
-            // Misc
-            + "XDOCSTA_0, XACTDISTMTS_0, XDOCSITE_0, XBREAKTYP_0, XLOADBAY_0,"
-            + "XSPECIFICRES_0, AUUID_0"
-            + ") VALUES ("
-            + "0,?,?,?,?,1,"           // UPDTICK_0=0, XNUMPC_0, XLINPC_0, SDHNUM_0, XPICK_SDH_0=empty, XDTYPE_0=1
-            + "?,?,?,?,?,?,"           // CREDAT_0, CREUSR_0, UPDUSR_0, UPDDAT_0, CREDATTIM_0, UPDDATTIM_0
-            + "?,?,?,"                 // SEQUENCE_0, FROMPREVDIST_0, FROMPREVTRA_0
-            + "?,?,?,?,"               // ARRIVEDATE_0, AARRIVEDATE_0, ARRIVETIME_0, AARRIVETIME_0
-            + "?,?,?,?,"               // DEPARTDATE_0, ADEPARTDATE_0, DEPARTTIME_0, ADEPARTTIME_0
-            + "?,?,?,?,"               // ARRIVEDATEUT_0, ARRIVETIMEUT_0, DEPARTDATEU_0, DEPARTTIMEU_0
-            + "?,?,?,?,?,"             // RAINONAFF 0-4
-            + "1,0,?,?,0,0,0,1,"       // OPTISTA_0=1, XLOADED_0=0, XACTETA_0, XACTETD_0, flags, XDLV_STATUS_0=1
-            + "?,?,?,0,?,0,0,?,"       // XMS_0, XVOL_0, SERVICETIME_0, XCALCDIS_0=0, XWAITTIME_0, SWAITTIME_0=0, SERVICETIM_0
-            + "?,?,?,?,0,"             // XDOCTYP_0 (dynamic per doc type), XPICKUP_DROP_0, XSEALNUM_0, XSKIPRES_0, XACTSEQ_0=0
-            + "?,?,?,?,"               // RDEPARTDATE_0, RDEPARTTIME_0, RARRIVEDATE_0, RARRIVETIME_0
-            + "?,?,?,?,"               // XCNFARRDATE_0, XCNFARRTIME_0, XCNFDEPDATE_0, XCNFDEPTIME_0
-            + "0,0,?,0,0,?,?"          // XDOCSTA_0=0, XACTDISTMTS_0=0, XDOCSITE_0, XBREAKTYP_0=0, XLOADBAY_0=0, XSPECIFICRES_0, AUUID_0
-            + ")";
-
         int seq = 1;
         for (Map<String, Object> s : stops) {
             try {
-                String docNum    = getString(s, "txn", "docNum", "id");
-                String arrDate   = getString(s, "arrivalDate");
-                String arrTime   = getString(s, "arrivalTime");
-                String depDate   = getString(s, "departureDate");
-                String depTime   = getString(s, "departureTime");
-                String srvTime   = getString(s, "serviceTime");
-                String waitTime  = getString(s, "waitingTime");
-                String prevDist  = getString(s, "fromPrevDistance");
-                String prevTravel= getString(s, "fromPrevTravelTime");
-                String site      = trip.getSite();
+                String docNum     = getString(s, "txn", "docNum", "id");
+                String arrDate    = getString(s, "arrivalDate");
+                String arrTime    = getString(s, "arrivalTime");
+                String depDate    = getString(s, "departureDate");
+                String depTime    = getString(s, "departureTime");
+                String srvTime    = getString(s, "serviceTime");
+                double waitNum    = parseDouble(getString(s, "waitingTime"));
+                double prevDist   = parseDouble(getString(s, "fromPrevDistance"));
+                double prevTravel = parseDouble(getString(s, "fromPrevTravelTime"));
 
-                // Parse dates
-                LocalDateTime arrDT  = parseDateTime(arrDate, arrTime);
-                LocalDateTime depDT  = parseDateTime(depDate, depTime);
+                VrDetail d = new VrDetail();
+                d.setTripCode(trip.getTripCode());
+                d.setDocNum(docNum);
+                d.setLineNum(seq * 1000);
+                d.setSeq(seq);
+                d.setFromPrevDistance(prevDist);
+                d.setFromPrevTravelTime(prevTravel);
+                d.setArrivalDate(parseDateTime(arrDate, arrTime));
+                d.setArrivalTime(arrTime);
+                d.setDepartureDate(parseDateTime(depDate, depTime));
+                d.setDepartureTime(depTime);
+                d.setServiceTime(srvTime);
+                d.setWaitingTime(waitNum);
+                // DROP=1, PICKUP=2 / X3 doc type 1=Delivery, 4=Pick Ticket —
+                // same docType-based check as before (stopType is always
+                // "DROP" for both, docType reliably distinguishes them).
+                d.setPickupDrop(isPickTicket(s) ? 2 : 1);
+                d.setDocTypeCode(isPickTicket(s) ? 4 : 1);
+                d.setSite(trip.getSite());
+                d.setCreatedAt(now);
+                d.setUpdatedAt(now);
 
-                // numeric values
-                double prevDistNum   = parseDouble(prevDist);
-                double prevTravelNum = parseDouble(prevTravel);
-                double waitNum       = parseDouble(waitTime);
-
-                // DROP=1, PICKUP=2 — use docType (reliable), not stopType
-                // (stopType is now always "DROP" for both DLV and PICK docs)
-                int pickupDrop = isPickTicket(s) ? 2 : 1;
-
-                // XDOCTYP_0 — X3's document-type list of values:
-                // 1=Delivery, 2=Pre Receipt, 3=Customer Return,
-                // 4=Pick Ticket, 5=Purchase Return, 6=Misc Stop,
-                // 8=Break, 9=Sales Order. Was hardcoded to 1 for every
-                // stop regardless of actual doc type — now set correctly
-                // per stop using the same reliable docType check.
-                int docTypeCode = isPickTicket(s) ? 4 : 1;
-
-                sqlServerJdbc.update(sql,
-                    // Keys
-                    trip.getTripCode(),          // XNUMPC_0
-                    seq * 1000,                  // XLINPC_0 = line * 1000
-                    docNum != null ? docNum : emptyStr, // SDHNUM_0
-                    emptyStr,                    // XPICK_SDH_0
-                    // Audit
-                    now, usr5, usr5, now, now, now,
-                    // Sequence + distances
-                    seq,                         // SEQUENCE_0
-                    prevDistNum,                 // FROMPREVDIST_0
-                    prevTravelNum,               // FROMPREVTRA_0
-                    // Planned arrival
-                    arrDT, arrDT,                // ARRIVEDATE_0, AARRIVEDATE_0
-                    arrTime != null ? arrTime : emptyStr,  // ARRIVETIME_0
-                    arrTime != null ? arrTime : emptyStr,  // AARRIVETIME_0
-                    // Planned departure
-                    depDT, depDT,                // DEPARTDATE_0, ADEPARTDATE_0
-                    depTime != null ? depTime : emptyStr,  // DEPARTTIME_0
-                    depTime != null ? depTime : emptyStr,  // ADEPARTTIME_0
-                    // UTC (same as planned)
-                    arrDT, arrTime != null ? arrTime : emptyStr,
-                    depDT, depTime != null ? depTime : emptyStr,
-                    // RAINONAFF 0-4
-                    emptyStr, emptyStr, emptyStr, emptyStr, emptyStr,
-                    // XACTETA_0, XACTETD_0
-                    arrTime != null ? arrTime : emptyStr,
-                    depTime != null ? depTime : emptyStr,
-                    // XMS_0, XVOL_0, SERVICETIME_0, XWAITTIME_0, SERVICETIM_0
-                    emptyStr, emptyStr,
-                    srvTime != null ? srvTime : emptyStr,
-                    waitNum,
-                    srvTime != null ? srvTime : emptyStr,
-                    // XDOCTYP_0, XPICKUP_DROP_0, XSEALNUM_0, XSKIPRES_0
-                    docTypeCode, pickupDrop, emptyStr, emptyStr,
-                    // RDEPARTDATE_0, RDEPARTTIME_0, RARRIVEDATE_0, RARRIVETIME_0
-                    now, emptyStr, now, emptyStr,
-                    // XCNFARRDATE_0, XCNFARRTIME_0, XCNFDEPDATE_0, XCNFDEPTIME_0
-                    now, emptyStr, now, emptyStr,
-                    // XDOCSITE_0, XSPECIFICRES_0, AUUID_0
-                    site != null ? site : emptyStr,
-                    emptyStr,
-                    emptyUuid
-                );
+                vrDetailRepository.save(d);
                 seq++;
             } catch (Exception e) {
-                log.error("XX10CPLANCHD stop {} for {}: {}", seq, trip.getTripCode(), e.getMessage());
+                log.error("xr_vrdetails stop {} for {}: {}", seq, trip.getTripCode(), e.getMessage());
             }
         }
-        log.info("XX10CPLANCHD: {} rows written for {}", stops.size(), trip.getTripCode());
+        log.info("xr_vrdetails: {} rows written for {}", stops.size(), trip.getTripCode());
     }
 
     private LocalDateTime parseDateTime(String date, String time) {
@@ -451,7 +236,7 @@ public class TripLockService {
             if (date == null || date.isBlank()) return LocalDateTime.now();
             String d = date.trim();
             String t = (time != null && !time.isBlank()) ? time.trim().substring(0, 5) : "00:00";
-            return java.time.LocalDateTime.parse(d + "T" + t + ":00");
+            return LocalDateTime.parse(d + "T" + t + ":00");
         } catch (Exception e) {
             return LocalDateTime.now();
         }
@@ -463,193 +248,46 @@ public class TripLockService {
     }
 
     // ═══════════════════════════════════════════════════════════
-    // XX10CLODSTOH — exact schema
+    // xr_lvsheader — replaces XX10CLODSTOH
     // ═══════════════════════════════════════════════════════════
-    private void writeLVSHeader(XrTrip trip, String x3, String userCode) {
-        Integer cnt = sqlServerJdbc.queryForObject(
-            "SELECT COUNT(*) FROM " + x3 + ".XX10CLODSTOH WHERE XVRSEL_0 = ?",
-            Integer.class, trip.getTripCode());
-        if (cnt != null && cnt > 0) { log.info("LVS already exists for {}", trip.getTripCode()); return; }
+    private void writeLvsHeader(XrTrip trip, String userCode) {
+        if (lvsHeaderRepository.findByTripCode(trip.getTripCode()).isPresent()) {
+            log.info("LVS already exists for {}", trip.getTripCode());
+            return;
+        }
 
-        LocalDateTime now    = LocalDateTime.now();
-        String e             = "";                     // empty string
-        String usr5          = userCode != null && userCode.length() > 5 ? userCode.substring(0,5) : (userCode != null ? userCode : "SYS");
-        byte[] emptyUuid     = new byte[16];
-        String veh           = trip.getVehicleCode() != null ? trip.getVehicleCode() : e;
-        String site          = trip.getSite()        != null ? trip.getSite()        : e;
-        String driverId      = trip.getDriverId()    != null ? trip.getDriverId()    : e;
-        String startTime     = trip.getStartTime()   != null ? trip.getStartTime()   : e;
-        String endTime       = trip.getEndTime()     != null ? trip.getEndTime()     : e;
-        String arrSite       = trip.getArrSite()     != null ? trip.getArrSite()     : e;
-        double capWeight     = parseDoubleSafe(trip.getTotalWeight());
-        int totalCases       = computeTotalCases(trip);
-        java.time.LocalDate  doc   = trip.getDocDate() != null ? trip.getDocDate() : java.time.LocalDate.now();
-        LocalDateTime docDt  = doc.atStartOfDay();
+        LocalDateTime now = LocalDateTime.now();
+        String usr = normalizeUser(userCode);
+        LocalDate doc = trip.getDocDate() != null ? trip.getDocDate() : LocalDate.now();
 
-        // Generate LVS number: {SITE}{YY}{MM}XCHG{0000001}
-        // e.g. KCC012506XCHG0000001
-        String lvsNum = generateLvsNumber(trip.getSite(), trip.getDocDate(), x3);
+        String lvsNum = generateLvsNumber(trip.getSite(), doc);
 
-        java.util.List<Object> p = new java.util.ArrayList<>();
-        p.add(0);           // UPDTICK_0
-        p.add(lvsNum);      // VCRNUM_0  — generated LVS number
-        p.add(0);           // BETFCYCOD_0 tinyint
-        p.add(site);        // STOFCY_0
-        p.add(e);           // FCYDES_0
-        p.add(site);        // PURFCY_0
-        p.add(site);        // SALFCY_0
-        p.add(e);           // FCYADD_0
-        p.add(e);           // BPSNUM_0
-        p.add(e);           // BPSADD_0
-        p.add(e);           // SCOLOC_0
-        p.add(e);           // PJT_0
-        p.add(e);           // BPCNUM_0
-        p.add(e);           // CUR_0
-        p.add(0);           // BETCPY_0
-        p.add(0);           // INVSGH_0
-        p.add(0);           // INVFLG_0
-        p.add(e);           // SIHNUM_0
-        p.add(docDt);       // IPTDAT_0 — trip date
-        p.add(e);           // VCRDES_0
-        p.add(e);           // TRSFAM_0
-        p.add(0);           // TRSTYP_0
-        p.add(e);           // TRSCOD_0
-        p.add(e);           // ENTCOD_0
-        // DIE_0..19
-        for (int i=0;i<=19;i++) p.add(e);
-        // CCE_0..19
-        for (int i=0;i<=19;i++) p.add(e);
-        p.add(e);           // WRHE_0
-        p.add(0);           // EXPNUM_0
-        p.add(0);           // IMPNUMLIG_0
-        p.add(now);         // CREDAT_0
-        p.add(usr5);        // CREUSR_0
-        p.add(now);         // UPDDAT_0
-        p.add(usr5);        // UPDUSR_0
-        p.add(now);         // CREDATTIM_0
-        p.add(now);         // UPDDATTIM_0
-        p.add(emptyUuid);   // AUUID_0
-        p.add(0);           // CFMFLG_0
-        p.add(e);           // SGHTYP_0
-        p.add(e);           // TMPSGHNUM_0
-        p.add(e);           // MANDOC_0
-        p.add(e);           // ATDTCOD_0
-        p.add(docDt);       // DPEDAT_0 — departure date
-        p.add(startTime);   // ETD_0 — start time
-        p.add(docDt);       // ARVDAT_0 — arrival date
-        p.add(endTime);     // ETA_0 — end time
-        p.add(veh);         // LICPLATE_0 — vehicle code
-        p.add(veh);         // TRLLICPLATE_0 — vehicle code
-        p.add(driverId);    // DRIVERID_0
-        p.add(e);           // XSALEMEN_0
-        p.add(e);           // XOPERATOR_0
-        p.add(e);           // XTECHN_0
-        p.add(driverId.length() > 15 ? driverId.substring(0,15) : driverId);    // XAPPUSR_0
-        p.add(lvsNum);      // XVCRNUM_0 — LVS number
-        p.add(0);           // XRETURNFLG_0
-        p.add(0);           // XACTFLG_0
-        p.add(0);           // XBUSTYP1_0
-        p.add(0);           // XBUSTYP2_0
-        p.add(trip.getTripCode()); // XVRSEL_0 — tripCode
-        p.add(e);           // XLOADREF_0
-        p.add(veh);         // CODEYVE_0 — vehicle code
-        p.add(1);           // XVALFLG_0
-        p.add(e);           // LOCSEL_0
-        p.add(0);           // XROUTNBR_0 — trip seq
-        p.add(e);           // XTEXTNUM_0
-        p.add(0.0);         // XTOTNONSTK_0
-        p.add(veh);         // XCODEYVE_0 — vehicle code
-        p.add(1);           // XLOADFLG_0 = 1 Generated
-        p.add(0);           // X10CHKIN_0
-        p.add(docDt);       // XXIPTDAT_0 — trip date
-        p.add(0);           // XSCHREALC_0
-        p.add(capWeight);   // XCAPACITIES_0 — trip weight
-        p.add(0.0);         // XVEHVOL_0
-        p.add(0.0);         // XTOTSHESTK_0
-        p.add(totalCases);  // XTOTCASES_0 — NOT NULL, sum of stop qty (nbPack)
-        p.add(e);           // XSEALNUMH_0
-        p.add(0);           // XUNLOADFLG_0
-        p.add(0);           // XSTARTODMTR_0
-        p.add(0);           // XENDODMTR_0
-        p.add(now);         // XCHKINDAT_0
-        p.add(e);           // XCHKINTIM_0
-        p.add(now);         // XCHKOUDAT_0
-        p.add(e);           // XCHKOUTIM_0
-        p.add(e); p.add(e); p.add(e); p.add(e); p.add(e); // XPMASS,XPVOL,XMASS,XVMASS,XLMASS
-        p.add(e); p.add(e); p.add(e);  // XVOLCAM,XVEHV,XMPVOL
-        p.add(now);         // XUNLOADDATE_0
-        p.add(e);           // XUNLOADEDBY_0
-        p.add(e);           // XUNLOADTIME_0
-        p.add(e); p.add(e); p.add(e); // TRAILER_0, TRAILER_1, TRAILER2_0
-        p.add(docDt);       // XVRDATE_0 — trip date
-        p.add(e);           // XSOURCELOC_0
-        p.add(0); p.add(0); // XLOADBAYD_0, XLOADBAYR_0
-        p.add(e);           // XDEVICEID_0
-        p.add(e);           // XOLDCODEYVE_0
-        p.add(arrSite);     // XDESFCY_0
-        p.add(0);           // XBUSTYP3_0
-        p.add(e);           // XBPTNUM_0 — carrier
-        p.add(veh);         // XECODEYVE_0 — vehicle code
-        p.add(driverId);    // XEDRIVERID_0 — driver code
-        p.add(e);           // XEREGSTR_0
-        p.add(e);           // XETRAILER_0
-        p.add(e);           // XETREGSTR_0
-        p.add(e); p.add(e); // XLOG_0, XPDLOG_0
-        p.add(0);           // XSTOVAL_0
-        p.add(e);           // XMOB_0
-        p.add(e);           // XWEB_0
-        p.add(0);           // XFORSEQ_0
-        p.add(e); p.add(e); p.add(e); // XLOADUSR_0, XLOADNAM_0, XLOADEML_0
-        p.add(e);           // XDRN_0
-        p.add(0); p.add(0); // XPODSUB_0, XPODSTATUS_0
-        p.add(0); p.add(0); // XLODAPPSTA_0, XROUTSTAT_0
-        p.add(0);           // XTRIP_0 — trip seq
-        p.add(e);           // MDL_0
-        p.add(0);           // XMLDUSER_0
-        p.add(e);           // XPOHNUM_0
-        p.add(0);           // XSTATUS_0
-        p.add(0);           // XALLFLG_0
-        p.add(e);           // XROUTERSA_0
-        p.add(e);           // XNOTE1_0
+        LvsHeader h = new LvsHeader();
+        h.setLvsNumber(lvsNum);
+        h.setTripCode(trip.getTripCode());
+        h.setSite(trip.getSite());
+        h.setArrSite(trip.getArrSite());
+        h.setVehicleCode(trip.getVehicleCode());
+        h.setDriverId(trip.getDriverId());
+        h.setDocDate(doc);
+        h.setDepartureDate(doc);
+        h.setDepartureTime(trip.getStartTime());
+        h.setArrivalDate(doc);
+        h.setArrivalTime(trip.getEndTime());
+        h.setCapacityWeight(parseDoubleSafe(trip.getTotalWeight()));
+        h.setTotalCases(computeTotalCases(trip));
+        h.setLoadFlag(1);
+        h.setCreatedAt(now);
+        h.setCreatedBy(usr);
+        h.setUpdatedAt(now);
+        h.setUpdatedBy(usr);
 
-        String cols =
-            "UPDTICK_0,VCRNUM_0,BETFCYCOD_0,STOFCY_0,FCYDES_0,PURFCY_0,SALFCY_0,FCYADD_0,"
-            + "BPSNUM_0,BPSADD_0,SCOLOC_0,PJT_0,BPCNUM_0,CUR_0,BETCPY_0,INVSGH_0,INVFLG_0,"
-            + "SIHNUM_0,IPTDAT_0,VCRDES_0,TRSFAM_0,TRSTYP_0,TRSCOD_0,ENTCOD_0,"
-            + "DIE_0,DIE_1,DIE_2,DIE_3,DIE_4,DIE_5,DIE_6,DIE_7,DIE_8,DIE_9,"
-            + "DIE_10,DIE_11,DIE_12,DIE_13,DIE_14,DIE_15,DIE_16,DIE_17,DIE_18,DIE_19,"
-            + "CCE_0,CCE_1,CCE_2,CCE_3,CCE_4,CCE_5,CCE_6,CCE_7,CCE_8,CCE_9,"
-            + "CCE_10,CCE_11,CCE_12,CCE_13,CCE_14,CCE_15,CCE_16,CCE_17,CCE_18,CCE_19,"
-            + "WRHE_0,EXPNUM_0,IMPNUMLIG_0,"
-            + "CREDAT_0,CREUSR_0,UPDDAT_0,UPDUSR_0,CREDATTIM_0,UPDDATTIM_0,AUUID_0,"
-            + "CFMFLG_0,SGHTYP_0,TMPSGHNUM_0,MANDOC_0,ATDTCOD_0,"
-            + "DPEDAT_0,ETD_0,ARVDAT_0,ETA_0,LICPLATE_0,TRLLICPLATE_0,"
-            + "DRIVERID_0,XSALEMEN_0,XOPERATOR_0,XTECHN_0,XAPPUSR_0,"
-            + "XVCRNUM_0,XRETURNFLG_0,XACTFLG_0,XBUSTYP1_0,XBUSTYP2_0,"
-            + "XVRSEL_0,XLOADREF_0,CODEYVE_0,XVALFLG_0,LOCSEL_0,"
-            + "XROUTNBR_0,XTEXTNUM_0,XTOTNONSTK_0,XCODEYVE_0,XLOADFLG_0,"
-            + "X10CHKIN_0,XXIPTDAT_0,XSCHREALC_0,XCAPACITIES_0,XVEHVOL_0,"
-            + "XTOTSHESTK_0,XTOTCASES_0,XSEALNUMH_0,XUNLOADFLG_0,XSTARTODMTR_0,XENDODMTR_0,"
-            + "XCHKINDAT_0,XCHKINTIM_0,XCHKOUDAT_0,XCHKOUTIM_0,"
-            + "XPMASS_0,XPVOL_0,XMASS_0,XVMASS_0,XLMASS_0,XVOLCAM_0,XVEHV_0,XMPVOL_0,"
-            + "XUNLOADDATE_0,XUNLOADEDBY_0,XUNLOADTIME_0,"
-            + "TRAILER_0,TRAILER_1,TRAILER2_0,XVRDATE_0,XSOURCELOC_0,"
-            + "XLOADBAYD_0,XLOADBAYR_0,XDEVICEID_0,XOLDCODEYVE_0,XDESFCY_0,"
-            + "XBUSTYP3_0,XBPTNUM_0,XECODEYVE_0,XEDRIVERID_0,XEREGSTR_0,"
-            + "XETRAILER_0,XETREGSTR_0,XLOG_0,XPDLOG_0,XSTOVAL_0,"
-            + "XMOB_0,XWEB_0,XFORSEQ_0,XLOADUSR_0,XLOADNAM_0,XLOADEML_0,"
-            + "XDRN_0,XPODSUB_0,XPODSTATUS_0,XLODAPPSTA_0,XROUTSTAT_0,"
-            + "XTRIP_0,MDL_0,XMLDUSER_0,XPOHNUM_0,XSTATUS_0,XALLFLG_0,XROUTERSA_0,XNOTE1_0";
-
-        String sql = "INSERT INTO " + x3 + ".XX10CLODSTOH (" + cols + ") VALUES ("
-            + String.join(",", java.util.Collections.nCopies(p.size(), "?")) + ")";
-
-        sqlServerJdbc.update(sql, p.toArray());
-        log.info("XX10CLODSTOH ({} fields) written for trip {}", p.size(), trip.getTripCode());
+        lvsHeaderRepository.save(h);
+        log.info("xr_lvsheader written for trip {} -> {}", trip.getTripCode(), lvsNum);
     }
 
     // ═══════════════════════════════════════════════════════════
-    // Update doc status on VALIDATE
+    // Update doc status on VALIDATE — still X3's own delivery documents
     // ═══════════════════════════════════════════════════════════
     @SuppressWarnings("unchecked")
     private void updateDocStatusOnValidate(XrTrip trip, String x3) {
@@ -670,9 +308,7 @@ public class TripLockService {
     }
 
     // Sums each stop's package/case count (qty, sourced from nbPack on the
-    // stops view) to give XTOTCASES_0 a real value instead of a hardcoded 0.
-    // Defensive: any parse failure or missing field just contributes 0,
-    // never throws — this must not block the Lock insert.
+    // stops view) to give total_cases a real value instead of a hardcoded 0.
     @SuppressWarnings("unchecked")
     private int computeTotalCases(XrTrip trip) {
         if (trip.getStopObjectsJson() == null) return 0;
@@ -694,51 +330,35 @@ public class TripLockService {
     }
 
     // ── Helpers ───────────────────────────────────────────────
-    // BUG FIX: this used to branch on "type"/"stopType", which is now
-    // ALWAYS "DROP" for every stop (business rule: pick tickets are a
-    // kind of drop — see X3RoutePlannerRepository.mapStop()). That made
-    // every pick-ticket stop silently fall into the SDELIVERY branch
-    // instead of STOPREH, so the update affected 0 rows (no matching
-    // SDHNUM_0 for a PIC-prefixed doc number) — nothing ever got written
-    // for pick tickets. "docType"/"doctype" ("DLV"/"PICK") is the field
-    // that still reliably identifies the underlying source table; it is
-    // NOT affected by the Drops/Pickups business-bucket reclassification.
     private boolean isPickTicket(Map<String, Object> stop) {
         String docType = getString(stop, "docType", "doctype");
         if (docType != null) return "PICK".equalsIgnoreCase(docType);
-        // Fallback for any older payloads saved before docType was reliably sent
         return "PICKUP".equals(getString(stop, "type", "stopType"));
     }
 
+    private String normalizeUser(String userCode) {
+        return userCode != null && userCode.length() > 5 ? userCode.substring(0, 5) : (userCode != null ? userCode : "SYS");
+    }
+
     // ── Generate LVS number: {SITE}{YY}{MM}XCHG{0000001} ──────
-    private String generateLvsNumber(String site, java.time.LocalDate docDate, String x3) {
-        try {
-            String s    = site != null ? site : "TMS";
-            // YY = 2-digit year, MM = 2-digit month
-            String yy   = String.format("%02d", (docDate != null ? docDate.getYear() : java.time.LocalDate.now().getYear()) % 100);
-            String mm   = String.format("%02d", docDate != null ? docDate.getMonthValue() : java.time.LocalDate.now().getMonthValue());
-            String prefix = s + yy + mm + "XCHG";
+    // Now sequenced against xr_lvsheader (Postgres) instead of querying
+    // X3's XX10CLODSTOH over SQL Server.
+    private String generateLvsNumber(String site, LocalDate docDate) {
+        String s = site != null ? site : "TMS";
+        String yy = String.format("%02d", (docDate != null ? docDate.getYear() : LocalDate.now().getYear()) % 100);
+        String mm = String.format("%02d", docDate != null ? docDate.getMonthValue() : LocalDate.now().getMonthValue());
+        String prefix = s + yy + mm + "XCHG";
 
-            // Find max sequence for this site+year+month prefix
-            String sql = "SELECT MAX(VCRNUM_0) FROM " + x3 + ".XX10CLODSTOH "
-                       + "WHERE VCRNUM_0 LIKE ?";
-            String maxVal = sqlServerJdbc.queryForObject(sql, String.class, prefix + "%");
-
-            int nextSeq = 1;
-            if (maxVal != null && maxVal.length() > prefix.length()) {
-                try {
-                    nextSeq = Integer.parseInt(maxVal.substring(prefix.length())) + 1;
-                } catch (Exception ignored) {}
+        int nextSeq = 1;
+        List<LvsHeader> existing = lvsHeaderRepository.findByLvsNumberStartingWithOrderByLvsNumberDesc(prefix);
+        if (!existing.isEmpty()) {
+            String maxVal = existing.get(0).getLvsNumber();
+            if (maxVal.length() > prefix.length()) {
+                try { nextSeq = Integer.parseInt(maxVal.substring(prefix.length())) + 1; }
+                catch (Exception ignored) {}
             }
-            return prefix + String.format("%07d", nextSeq);
-        } catch (Exception e) {
-            // Fallback if table doesn't exist yet
-            log.warn("LVS number generation fallback: {}", e.getMessage());
-            String s  = site != null ? site : "TMS";
-            String yy = String.format("%02d", java.time.LocalDate.now().getYear() % 100);
-            String mm = String.format("%02d", java.time.LocalDate.now().getMonthValue());
-            return s + yy + mm + "XCHG" + String.format("%07d", 1);
         }
+        return prefix + String.format("%07d", nextSeq);
     }
 
     private XrTrip findTrip(String tripCode) {
@@ -748,15 +368,6 @@ public class TripLockService {
 
     private String getString(Map<String, Object> m, String... keys) {
         for (String k : keys) { Object v = m.get(k); if (v != null) return v.toString(); }
-        return null;
-    }
-
-    private Double dbl(Map<String, Object> m, String... keys) {
-        for (String k : keys) {
-            Object v = m.get(k);
-            if (v instanceof Number) return ((Number) v).doubleValue();
-            if (v instanceof String) { try { return Double.parseDouble((String) v); } catch (Exception ignored) {} }
-        }
         return null;
     }
 }

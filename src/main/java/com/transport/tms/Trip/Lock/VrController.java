@@ -1,89 +1,81 @@
 package com.transport.tms.Trip.Lock;
 
-import com.transport.tms.Config.SchemaConfig;
 import com.transport.tms.Fleet.Entity.Driver;
 import com.transport.tms.Fleet.Entity.Vehicle;
 import com.transport.tms.Fleet.Repository.DriverRepository;
 import com.transport.tms.Fleet.Repository.VehicleRepository;
+import com.transport.tms.Trip.Lock.Entity.LvsHeader;
+import com.transport.tms.Trip.Lock.Entity.VrDetail;
+import com.transport.tms.Trip.Lock.Entity.VrHeader;
+import com.transport.tms.Trip.Lock.Repository.LvsHeaderRepository;
+import com.transport.tms.Trip.Lock.Repository.VrDetailRepository;
+import com.transport.tms.Trip.Lock.Repository.VrHeaderRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 /**
- * VR / VRD / LVS read endpoints — mirrors CBTTL system
+ * VR / VRD / LVS read endpoints — now reads from xr_vrheader/xr_vrdetails/
+ * xr_lvsheader (Postgres) instead of XX10CPLANCHA/XX10CPLANCHD/XX10CLODSTOH
+ * (X3 SQL Server). Response field names/shape are kept identical to what
+ * the frontend already consumes — only the data source changed.
  *
  * GET /api/v1/transport/vr?vrcode=VR-KCC01-20260624-001
- *     → XX10CPLANCHA + enriched with vehicle class/image + driver name/image
- *
  * GET /api/v1/transport/vrdetails?vrcode=VR-KCC01-20260624-001
- *     → XX10CPLANCHD stop rows
- *
  * GET /api/v1/transport/loadvehstk?vrcode=VR-KCC01-20260624-001
- *     → XX10CLODSTOH LVS row + loadstk status
  */
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/transport")
+@RequiredArgsConstructor
 public class VrController {
 
-    private final SchemaConfig      schemas;
-    private final JdbcTemplate      sqlServerJdbc;
-    private final VehicleRepository vehicleRepo;
-    private final DriverRepository  driverRepo;
+    private final VrHeaderRepository  vrHeaderRepo;
+    private final VrDetailRepository  vrDetailRepo;
+    private final LvsHeaderRepository lvsHeaderRepo;
+    private final VehicleRepository   vehicleRepo;
+    private final DriverRepository    driverRepo;
 
-    public VrController(
-            SchemaConfig schemas,
-            @Qualifier("sqlServerJdbcTemplate") JdbcTemplate sqlServerJdbc,
-            VehicleRepository vehicleRepo,
-            DriverRepository driverRepo) {
-        this.schemas       = schemas;
-        this.sqlServerJdbc = sqlServerJdbc;
-        this.vehicleRepo   = vehicleRepo;
-        this.driverRepo    = driverRepo;
-    }
-
-    // ── VR Header — XX10CPLANCHA + enrichment ─────────────────
+    // ── VR Header — xr_vrheader + enrichment ──────────────────
     @GetMapping("/vr")
     public Map<String, Object> getVr(@RequestParam String vrcode) {
-        String x3  = schemas.getX3Schema();
-        String sql = "SELECT XNUMPC_0 AS xnumpc, CODEYVE_0 AS codeyve,"
-                   + " XCODEYVE_0, FCY_0 AS fcy, DRIVERID_0 AS driverid,"
-                   + " HEUDEP_0 AS heudep, HEUARR_0 AS heuarr,"
-                   + " HEUEXEC_0 AS heuexec, DATEXEC_0 AS datexec,"
-                   + " DATLIV_0 AS datliv, DATARR_0 AS datarr,"
-                   + " ADATLIV_0 AS adatliv, ADATARR_0 AS adatarr,"
-                   + " AHEUDEP_0 AS aheudep, AHEUARR_0 AS aheuarr,"
-                   + " OPTIMSTA_0 AS optimsta, DISPSTAT_0 AS dispstat,"
-                   + " XVRY_0 AS xvry, XVALID_0 AS xvalid,"
-                   + " XSTATUS_0 AS xstatus, XROUTNBR_0 AS xroutnbr,"
-                   + " TOTDISTANCE_0 AS totdistance, TOTTIME_0 AS tottime,"
-                   + " BPTNUM_0 AS bptnum, XDESFCY_0 AS xdesfcy,"
-                   + " TOTALCOST_0 AS totalcost, TOTALDISTANC_0 AS totaldistanc,"
-                   + " TOTALTIME_0 AS totaltime, TOTALTRAVELT_0 AS totaltravelt,"
-                   + " TRAILER_0 AS trailer, XLOADBAY_0 AS loadbay,"
-                   + " JOBID_0 AS jobid, JOBSTATUS_0 AS jobstatus"
-                   + " FROM " + x3 + ".XX10CPLANCHA WHERE XNUMPC_0 = ?";
+        Optional<VrHeader> found = vrHeaderRepo.findById(vrcode);
+        if (found.isEmpty()) return Collections.emptyMap();
+        VrHeader h = found.get();
 
-        List<Map<String, Object>> rows = sqlServerJdbc.queryForList(sql, vrcode);
-        if (rows.isEmpty()) return Collections.emptyMap();
-
-        Map<String, Object> vr = new LinkedHashMap<>(rows.get(0));
+        Map<String, Object> vr = new LinkedHashMap<>();
+        vr.put("xnumpc", h.getTripCode());
+        vr.put("codeyve", h.getVehicleCode());
+        vr.put("fcy", h.getSite());
+        vr.put("driverid", h.getDriverId());
+        vr.put("heudep", h.getStartTime());
+        vr.put("heuarr", h.getEndTime());
+        vr.put("datliv", h.getDocDate());
+        vr.put("datarr", h.getDocDate());
+        vr.put("optimsta", h.getStatus());
+        vr.put("dispstat", h.getStatus());
+        vr.put("xvalid", h.getStatus());
+        vr.put("xstatus", h.getStatus());
+        vr.put("totdistance", h.getTotalDistance());
+        vr.put("tottime", h.getTotalTime());
+        vr.put("xdesfcy", h.getArrSite());
+        vr.put("totalcost", h.getTotalCost());
+        vr.put("totaldistanc", h.getTotalDistance());
+        vr.put("totaltime", h.getTotalTime());
+        vr.put("totaltravelt", h.getTravelTime());
 
         // ── Enrich: Vehicle class/category + image ────────────
-        String vehicleCode = str(vr, "codeyve");
+        String vehicleCode = h.getVehicleCode();
         if (vehicleCode != null) {
             vehicleRepo.findById(vehicleCode).ifPresent(v -> {
-                // Vehicle class/category
                 if (v.getCategory() != null) {
-                    vr.put("vehicleClass",       v.getCategory().getCategoryCode());
-                    vr.put("vehicleClassDesc",   v.getCategory().getDescription());
-                    vr.put("vehclass",           v.getCategory().getCategoryCode()); // CBTTL compat
+                    vr.put("vehicleClass",     v.getCategory().getCategoryCode());
+                    vr.put("vehicleClassDesc", v.getCategory().getDescription());
+                    vr.put("vehclass",         v.getCategory().getCategoryCode()); // CBTTL compat
                 }
-                // Vehicle image as Base64
                 if (v.getVehicleImage() != null && v.getVehicleImage().length > 0) {
                     vr.put("vehicleImage", "data:image/jpeg;base64,"
                         + Base64.getEncoder().encodeToString(v.getVehicleImage()));
@@ -95,12 +87,11 @@ public class VrController {
         }
 
         // ── Enrich: Driver name + image ───────────────────────
-        String driverId = str(vr, "driverid");
+        String driverId = h.getDriverId();
         if (driverId != null) {
             driverRepo.findById(driverId).ifPresent(d -> {
-                vr.put("driverName",  d.getDriverName());
+                vr.put("driverName",   d.getDriverName());
                 vr.put("driverMobile", d.getMobileNo());
-                // Driver image as Base64
                 if (d.getDriverImage() != null && d.getDriverImage().length > 0) {
                     vr.put("driverImage", "data:image/jpeg;base64,"
                         + Base64.getEncoder().encodeToString(d.getDriverImage()));
@@ -109,86 +100,103 @@ public class VrController {
         }
 
         // ── LVS status (if validated) ─────────────────────────
-        try {
-            String lvsSql = "SELECT VCRNUM_0, XLOADFLG_0 FROM "
-                          + x3 + ".XX10CLODSTOH WHERE XVRSEL_0 = ?";
-            List<Map<String, Object>> lvs = sqlServerJdbc.queryForList(lvsSql, vrcode);
-            if (!lvs.isEmpty()) {
-                vr.put("lvsNumber",  lvs.get(0).get("VCRNUM_0"));
-                vr.put("loadStatus", lvs.get(0).get("XLOADFLG_0"));
-                vr.put("validated",  true);
-            } else {
-                vr.put("validated", false);
-            }
-        } catch (Exception e) {
-            log.debug("LVS check failed: {}", e.getMessage());
+        Optional<LvsHeader> lvs = lvsHeaderRepo.findByTripCode(vrcode);
+        if (lvs.isPresent()) {
+            vr.put("lvsNumber",  lvs.get().getLvsNumber());
+            vr.put("loadStatus", lvs.get().getLoadFlag());
+            vr.put("validated",  true);
+        } else {
+            vr.put("validated", false);
         }
 
         // ── Creation time format MM-DD-YYYY HH:mm ─────────────
-        if (vr.get("datexec") instanceof java.sql.Timestamp ts) {
-            vr.put("creationTime", ts.toLocalDateTime()
-                .format(DateTimeFormatter.ofPattern("MM-dd-yyyy HH:mm")));
+        if (h.getCreatedAt() != null) {
+            vr.put("creationTime", h.getCreatedAt().format(DateTimeFormatter.ofPattern("MM-dd-yyyy HH:mm")));
         }
 
         return vr;
     }
 
-    // ── VR Details — XX10CPLANCHD ─────────────────────────────
+    // ── VR Details — xr_vrdetails ─────────────────────────────
     @GetMapping("/vrdetails")
     public List<Map<String, Object>> getVrDetails(@RequestParam String vrcode) {
-        String x3  = schemas.getX3Schema();
-        String sql = "SELECT XNUMPC_0 AS xnumpc, SDHNUM_0 AS sdhnum,"
-                   + " XLINPC_0 AS xlinpc, SEQUENCE_0 AS sequence,"
-                   + " XDTYPE_0 AS xdtype, XPICKUP_DROP_0 AS pickupdrop,"
-                   + " ARRIVEDATE_0 AS arrivedate, ARRIVETIME_0 AS arrivetime,"
-                   + " DEPARTDATE_0 AS departdate, DEPARTTIME_0 AS departtime,"
-                   + " AARRIVEDATE_0 AS aarrivedate, AARRIVETIME_0 AS aarrivetime,"
-                   + " ADEPARTDATE_0 AS adepartdate, ADEPARTTIME_0 AS adeparttime,"
-                   + " FROMPREVDIST_0 AS fromprevdist, FROMPREVTRA_0 AS fromprevtra,"
-                   + " SERVICETIME_0 AS servicetime, XWAITTIME_0 AS waittime,"
-                   + " OPTISTA_0 AS optista, XLOADED_0 AS xloaded,"
-                   + " XDLV_STATUS_0 AS xdlvstatus, XDOCSITE_0 AS xdocsite,"
-                   + " XACTETA_0 AS xacteta, XACTETD_0 AS xactetd,"
-                   + " XCALCDIS_0 AS xcalcdis, XACTSEQ_0 AS xactseq"
-                   + " FROM " + x3 + ".XX10CPLANCHD"
-                   + " WHERE XNUMPC_0 = ? ORDER BY SEQUENCE_0";
-
-        return sqlServerJdbc.queryForList(sql, vrcode);
+        List<VrDetail> details = vrDetailRepo.findByTripCodeOrderBySeqAsc(vrcode);
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (VrDetail d : details) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("xnumpc", d.getTripCode());
+            row.put("sdhnum", d.getDocNum());
+            row.put("xlinpc", d.getLineNum());
+            row.put("sequence", d.getSeq());
+            row.put("xdtype", 1);
+            row.put("pickupdrop", d.getPickupDrop());
+            row.put("arrivedate", d.getArrivalDate());
+            row.put("arrivetime", d.getArrivalTime());
+            row.put("departdate", d.getDepartureDate());
+            row.put("departtime", d.getDepartureTime());
+            row.put("aarrivedate", d.getArrivalDate());
+            row.put("aarrivetime", d.getArrivalTime());
+            row.put("adepartdate", d.getDepartureDate());
+            row.put("adeparttime", d.getDepartureTime());
+            row.put("fromprevdist", d.getFromPrevDistance());
+            row.put("fromprevtra", d.getFromPrevTravelTime());
+            row.put("servicetime", d.getServiceTime());
+            row.put("waittime", d.getWaitingTime());
+            row.put("optista", 1);
+            row.put("xloaded", 0);
+            row.put("xdlvstatus", 1);
+            row.put("xdocsite", d.getSite());
+            row.put("xacteta", d.getArrivalTime());
+            row.put("xactetd", d.getDepartureTime());
+            row.put("xcalcdis", 0);
+            row.put("xactseq", 0);
+            out.add(row);
+        }
+        return out;
     }
 
-    // ── LVS Header — XX10CLODSTOH ─────────────────────────────
+    // ── LVS Header — xr_lvsheader ─────────────────────────────
     @GetMapping("/loadvehstk")
     public Map<String, Object> getLvs(@RequestParam String vrcode) {
-        String x3  = schemas.getX3Schema();
-        String sql = "SELECT VCRNUM_0 AS vcrnum, XVRSEL_0 AS xvrsel,"
-                   + " STOFCY_0 AS stofcy, SALFCY_0 AS salfcy,"
-                   + " DRIVERID_0 AS driverid, CODEYVE_0 AS codeyve,"
-                   + " XCODEYVE_0, LICPLATE_0 AS licplate,"
-                   + " DPEDAT_0 AS dpedat, ETD_0 AS etd,"
-                   + " ARVDAT_0 AS arvdat, ETA_0 AS eta,"
-                   + " IPTDAT_0 AS iptdat, XVRDATE_0 AS xvrdate,"
-                   + " XLOADFLG_0 AS xloadflg, XVALFLG_0 AS xvalflg,"
-                   + " XCAPACITIES_0 AS xcapacities, XVEHVOL_0 AS xvehvol,"
-                   + " XROUTNBR_0 AS xroutnbr, XTRIP_0 AS xtrip,"
-                   + " XDESFCY_0 AS xdesfcy, XBPTNUM_0 AS xbptnum,"
-                   + " CREDAT_0 AS credat, CREUSR_0 AS creusr,"
-                   + " XAPPUSR_0 AS xappusr, XSTATUS_0 AS xstatus"
-                   + " FROM " + x3 + ".XX10CLODSTOH WHERE XVRSEL_0 = ?";
+        Optional<LvsHeader> found = lvsHeaderRepo.findByTripCode(vrcode);
+        if (found.isEmpty()) return Collections.emptyMap();
+        LvsHeader h = found.get();
 
-        List<Map<String, Object>> rows = sqlServerJdbc.queryForList(sql, vrcode);
-        if (rows.isEmpty()) return Collections.emptyMap();
-
-        Map<String, Object> lvs = new LinkedHashMap<>(rows.get(0));
+        Map<String, Object> lvs = new LinkedHashMap<>();
+        lvs.put("vcrnum", h.getLvsNumber());
+        lvs.put("xvrsel", h.getTripCode());
+        lvs.put("stofcy", h.getSite());
+        lvs.put("salfcy", h.getSite());
+        lvs.put("driverid", h.getDriverId());
+        lvs.put("codeyve", h.getVehicleCode());
+        lvs.put("licplate", h.getVehicleCode());
+        lvs.put("dpedat", h.getDepartureDate());
+        lvs.put("etd", h.getDepartureTime());
+        lvs.put("arvdat", h.getArrivalDate());
+        lvs.put("eta", h.getArrivalTime());
+        lvs.put("iptdat", h.getDocDate());
+        lvs.put("xvrdate", h.getDocDate());
+        lvs.put("xloadflg", h.getLoadFlag());
+        lvs.put("xvalflg", 1);
+        lvs.put("xcapacities", h.getCapacityWeight());
+        lvs.put("xvehvol", 0.0);
+        lvs.put("xroutnbr", 0);
+        lvs.put("xtrip", 0);
+        lvs.put("xdesfcy", h.getArrSite());
+        lvs.put("xbptnum", "");
+        lvs.put("credat", h.getCreatedAt());
+        lvs.put("creusr", h.getCreatedBy());
+        lvs.put("xappusr", h.getDriverId());
+        lvs.put("xstatus", 1);
 
         // Enrich driver name
-        String driverId = str(lvs, "driverid");
+        String driverId = h.getDriverId();
         if (driverId != null) {
-            driverRepo.findById(driverId).ifPresent(d ->
-                lvs.put("driverName", d.getDriverName()));
+            driverRepo.findById(driverId).ifPresent(d -> lvs.put("driverName", d.getDriverName()));
         }
 
         // Enrich vehicle class
-        String vehicleCode = str(lvs, "codeyve");
+        String vehicleCode = h.getVehicleCode();
         if (vehicleCode != null) {
             vehicleRepo.findById(vehicleCode).ifPresent(v -> {
                 if (v.getCategory() != null) {
@@ -199,11 +207,5 @@ public class VrController {
         }
 
         return lvs;
-    }
-
-    // ── Helper ─────────────────────────────────────────────────
-    private String str(Map<String, Object> m, String key) {
-        Object v = m.get(key);
-        return v != null && !v.toString().isBlank() ? v.toString().trim() : null;
     }
 }
