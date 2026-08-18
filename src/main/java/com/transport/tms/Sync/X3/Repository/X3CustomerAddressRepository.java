@@ -23,8 +23,16 @@ public class X3CustomerAddressRepository {
 
     public Integer count() {
         String x3  = schemas.getX3Schema();
+        // BUG FIX: was missing "WHERE A.BPATYP_0 = 1" — the exact filter
+        // findCustomerAddresses() below actually uses. This made the "X3"
+        // count shown in Sync History count every address type (all
+        // BPATYP_0 values), not just the ones actually fetched/synced —
+        // so it never matched Before/After/Inserted+Updated even when
+        // the sync was working correctly, making it look like data was
+        // missing when it wasn't.
         String sql = "SELECT COUNT(*) FROM " + x3 + ".BPADDRESS A"
-                   + " INNER JOIN " + x3 + ".BPCUSTOMER C ON A.BPANUM_0 = C.BPCNUM_0";
+                   + " INNER JOIN " + x3 + ".BPCUSTOMER C ON A.BPANUM_0 = C.BPCNUM_0"
+                   + " WHERE A.BPATYP_0 = 1";
         return jdbcTemplate.queryForObject(sql, Integer.class);
     }
 
