@@ -12,4 +12,9 @@ public interface LvsHeaderRepository extends JpaRepository<LvsHeader, String> {
 
     /** For LVS number sequencing — same prefix-matching approach as before. */
     List<LvsHeader> findByLvsNumberStartingWithOrderByLvsNumberDesc(String prefix);
+
+    /** Mobile app trip list — all trips (LVS records) assigned to a
+     *  driver. No date/status filter yet, per current scope — shows
+     *  everything, to be refined later. */
+    List<LvsHeader> findByDriverIdOrderByDocDateDesc(String driverId);
 }

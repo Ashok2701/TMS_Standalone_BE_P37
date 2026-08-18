@@ -4,12 +4,10 @@ import com.transport.tms.Pod.Dto.*;
 import com.transport.tms.Pod.Service.PodService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +20,13 @@ import java.util.Map;
 // exposing endpoints that would 500 on first real use ("relation
 // xr_pod does not exist"). Re-enable by uncommenting @RestController
 // once the table (see POD_API_DOCUMENTATION.md's migration SQL) exists.
+//
+// NOTE: GET /trips (below, PodService.getMyTrips) is now SUPERSEDED by
+// PodTripListController — that one reads from xr_lvsheader per the
+// confirmed mobile app spec; this one read from xr_trip.stop_objects,
+// an earlier draft design. Removed here to avoid a route collision if
+// this controller is ever re-enabled; getStopDetail/completeStop/getPod
+// below are unrelated to trip listing and still valid future work.
 // @RestController
 @RequestMapping("/api/pod")
 @RequiredArgsConstructor
@@ -29,17 +34,6 @@ import java.util.Map;
 public class PodController {
 
     private final PodService podService;
-
-    @GetMapping("/trips")
-    public ResponseEntity<Object> getMyTrips(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        return ok(() -> podService.getMyTrips(date));
-    }
-
-    @GetMapping("/trips/{tripCode}/stops")
-    public ResponseEntity<Object> getTripStops(@PathVariable String tripCode) {
-        return ok(() -> podService.getTripStops(tripCode));
-    }
 
     @GetMapping("/stops/{docNum}")
     public ResponseEntity<Object> getStopDetail(@PathVariable String docNum) {

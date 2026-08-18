@@ -6,4 +6,6 @@ import com.transport.tms.Pod.Dto.DriverLoginResponseDTO;
 public interface DriverAuthService {
 
     DriverLoginResponseDTO login(DriverLoginRequestDTO dto);
+
+    void logout(String driverId);
 }

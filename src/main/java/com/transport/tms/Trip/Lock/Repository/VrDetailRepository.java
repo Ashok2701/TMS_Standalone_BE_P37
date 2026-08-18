@@ -11,4 +11,6 @@ public interface VrDetailRepository extends JpaRepository<VrDetail, UUID> {
     List<VrDetail> findByTripCodeOrderBySeqAsc(String tripCode);
 
     void deleteByTripCode(String tripCode);
+
+    long countByTripCode(String tripCode);
 }

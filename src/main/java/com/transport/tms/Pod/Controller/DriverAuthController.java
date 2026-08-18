@@ -3,6 +3,7 @@ package com.transport.tms.Pod.Controller;
 import com.transport.tms.Config.Anonymous;
 import com.transport.tms.Pod.Dto.DriverLoginRequestDTO;
 import com.transport.tms.Pod.Dto.DriverLoginResponseDTO;
+import com.transport.tms.Pod.Service.CurrentDriver;
 import com.transport.tms.Pod.Service.DriverAuthService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +24,7 @@ import java.util.Map;
 public class DriverAuthController {
 
     private final DriverAuthService authService;
+    private final CurrentDriver currentDriver;
 
     @PostMapping("/login")
     @Anonymous
@@ -34,6 +36,29 @@ public class DriverAuthController {
 
         } catch (RuntimeException ex) {
             log.error("Driver login failed for username={}", dto.getUsername(), ex);
+
+            Map<String, String> error = new HashMap<>();
+            error.put("message", ex.getMessage());
+
+            return ResponseEntity
+                    .status(HttpStatus.BAD_REQUEST)
+                    .body(error);
+        }
+    }
+
+    /** Requires a valid driver token — resolves which driver is logging
+     *  out from the token itself (via CurrentDriver), never from a
+     *  request parameter, so one driver's token can't be used to close
+     *  another driver's session. */
+    @PostMapping("/logout")
+    public ResponseEntity<Object> logout() {
+        try {
+            String driverId = currentDriver.require().getDriverId();
+            authService.logout(driverId);
+            return ResponseEntity.ok(Map.of("message", "Logged out"));
+
+        } catch (RuntimeException ex) {
+            log.error("Driver logout failed: {}", ex.getMessage());
 
             Map<String, String> error = new HashMap<>();
             error.put("message", ex.getMessage());
