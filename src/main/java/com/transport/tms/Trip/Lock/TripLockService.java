@@ -180,7 +180,7 @@ public class TripLockService {
         }
 
         List<Map<String, Object>> rows = resp != null ? (List<Map<String, Object>>) resp.getOrDefault("grp1", List.of()) : List.of();
-        long failed = rows.stream().filter(r -> !"2".equals(String.valueOf(r.get("o_xstatus")))).count();
+        long failed = rows.stream().filter(r -> !isX3Success(r.get("o_xstatus"), r.get("o_xmess"))).count();
 
         if (!rows.isEmpty() && failed == 0) {
             lvs.setConfirmedFlag(1);
@@ -222,12 +222,38 @@ public class TripLockService {
             throw new RuntimeException("X3 load truck failed: " + resp.get("error"));
         }
 
+        // BUG FIX: this used to only check for a transport-level error
+        // (resp.get("error"), set only if the SOAP call itself threw) —
+        // it never looked at X3's own business-level o_xstatus/o_xmess
+        // at all, so a genuine business rejection from X3 (a real
+        // non-success status, not an "already loaded" idempotent case)
+        // would have been silently treated as success and load_flag set
+        // anyway. Now actually checks the response, same isX3Success()
+        // rule as confirmLvs — status "2", OR a message indicating the
+        // truck/LVS was already loaded, both count as success.
+        if (resp != null && resp.containsKey("o_xstatus") && !isX3Success(resp.get("o_xstatus"), resp.get("o_xmess"))) {
+            throw new RuntimeException("X3 load truck failed: " + resp.get("o_xmess"));
+        }
+
         lvs.setLoadFlag(1);
         lvs.setUpdatedAt(LocalDateTime.now());
         lvsHeaderRepository.save(lvs);
         log.info("TRUCK LOADED for {} (LVS {})", tripCode, lvs.getLvsNumber());
 
         return resp;
+    }
+
+    // A document/LVS action counts as successful if X3 returns its
+    // normal success status (2) — OR if the message indicates it was
+    // already done (already confirmed/created/loaded/exists), which X3
+    // also reports as status 2 in every case we've seen (e.g.
+    // XX10CVTLOC's "Location already created for this vehicle/trailer"),
+    // but this message-based fallback covers it even if a specific
+    // service ever returns a different status for that case.
+    private boolean isX3Success(Object status, Object message) {
+        if ("2".equals(String.valueOf(status))) return true;
+        String msg = message != null ? String.valueOf(message).toLowerCase() : "";
+        return msg.contains("already");
     }
 
 
