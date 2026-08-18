@@ -37,7 +37,7 @@ public class X3CustomerAddressRepository {
                    + " CASE WHEN C.BPAADD_0 = A.BPAADD_0 THEN 1 ELSE 0 END AS IS_DEFAULT"
                    + " FROM " + x3 + ".BPADDRESS A"
                    + " INNER JOIN " + x3 + ".BPCUSTOMER C ON A.BPANUM_0 = C.BPCNUM_0"
-                   + " ORDER BY C.BPCNUM_0, IS_DEFAULT DESC";
+                   + " WHERE A.BPATYP_0 = 1 ORDER BY C.BPCNUM_0, IS_DEFAULT DESC";
 
         return jdbcTemplate.query(sql, (rs, row) -> {
             X3CustomerAddressDTO dto = new X3CustomerAddressDTO();
