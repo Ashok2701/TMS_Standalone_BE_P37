@@ -45,6 +45,24 @@ public class TripLockController {
             "message", "Trip validated — LVS created", "tripCode", tripCode, "action", "VALIDATE"));
     }
 
+    /** LVS Confirm — XX10CRESDH for every document on the trip, then
+     *  sets xr_lvsheader.confirmed_flag on success. */
+    @PostMapping("/{tripCode}/lvs-confirm")
+    public ResponseEntity<?> lvsConfirm(@PathVariable String tripCode) {
+        Map<String, Object> x3Response = lockService.confirmLvs(tripCode);
+        return ResponseEntity.ok(Map.of(
+            "message", "LVS confirmed", "tripCode", tripCode, "action", "LVS_CONFIRM", "x3Response", x3Response));
+    }
+
+    /** Load Truck — X10CSTKMTV, then sets xr_lvsheader.load_flag on
+     *  success. Blocked server-side unless confirmed_flag is already set. */
+    @PostMapping("/{tripCode}/load-truck")
+    public ResponseEntity<?> loadTruck(@PathVariable String tripCode) {
+        Map<String, Object> x3Response = lockService.loadTruck(tripCode);
+        return ResponseEntity.ok(Map.of(
+            "message", "Truck loaded", "tripCode", tripCode, "action", "LOAD_TRUCK", "x3Response", x3Response));
+    }
+
     @PostMapping("/{tripCode}/unlock")
     public ResponseEntity<?> unlock(
             @PathVariable String tripCode,

@@ -177,7 +177,15 @@ public class VrController {
         lvs.put("iptdat", h.getDocDate());
         lvs.put("xvrdate", h.getDocDate());
         lvs.put("xloadflg", h.getLoadFlag());
-        lvs.put("xvalflg", 1);
+        // BUG FIX: was hardcoded to 1 regardless of actual state.
+        // xvalflg now reflects whether LVS Confirm has actually
+        // succeeded (confirmed_flag), and confirmedFlag/loadFlag are
+        // exposed under clearer names too for the frontend to gate
+        // "LVS Confirm" (needs !confirmed) and "Load Truck" (needs
+        // confirmed && !loaded) button states correctly.
+        lvs.put("xvalflg", h.getConfirmedFlag());
+        lvs.put("confirmedFlag", h.getConfirmedFlag());
+        lvs.put("loadFlag", h.getLoadFlag());
         lvs.put("xcapacities", h.getCapacityWeight());
         lvs.put("xvehvol", 0.0);
         lvs.put("xroutnbr", 0);

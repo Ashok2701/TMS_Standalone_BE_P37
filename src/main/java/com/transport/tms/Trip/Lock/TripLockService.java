@@ -143,7 +143,94 @@ public class TripLockService {
         log.info("UNLOCKED {}", tripCode);
     }
 
-    // ── GROUP ─────────────────────────────────────────────────
+    // ── LVS CONFIRM ───────────────────────────────────────────
+    // Calls X3's XX10CRESDH for every document on the trip, and only if
+    // ALL of them succeed, sets xr_lvsheader.confirmed_flag = 1 —
+    // enforcing the sequential LVS Create -> LVS Confirm -> Load Truck
+    // flow with a real, persisted flag rather than trusting the
+    // frontend to remember what state things are in.
+    @Transactional
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> confirmLvs(String tripCode) {
+        XrTrip trip = findTrip(tripCode);
+        LvsHeader lvs = lvsHeaderRepository.findByTripCode(tripCode)
+                .orElseThrow(() -> new RuntimeException("LVS not created yet for " + tripCode + " — complete LVS Create first."));
+
+        if (trip.getStopObjectsJson() == null || trip.getStopObjectsJson().isBlank())
+            throw new RuntimeException("Trip has no documents to confirm: " + tripCode);
+
+        List<Map<String, Object>> stops;
+        try {
+            stops = objectMapper.readValue(trip.getStopObjectsJson(),
+                objectMapper.getTypeFactory().constructCollectionType(List.class, Map.class));
+        } catch (Exception e) {
+            throw new RuntimeException("Cannot read documents for " + tripCode + ": " + e.getMessage());
+        }
+        List<String> docNums = new ArrayList<>();
+        for (Map<String, Object> s : stops) {
+            String docNum = getString(s, "txn", "docNum", "id");
+            if (docNum != null) docNums.add(docNum);
+        }
+        if (docNums.isEmpty())
+            throw new RuntimeException("Trip has no documents to confirm: " + tripCode);
+
+        Map<String, Object> resp = x3SoapService.confirmDeliveries(docNums);
+        if (resp != null && resp.get("error") != null) {
+            throw new RuntimeException("X3 confirm failed: " + resp.get("error"));
+        }
+
+        List<Map<String, Object>> rows = resp != null ? (List<Map<String, Object>>) resp.getOrDefault("grp1", List.of()) : List.of();
+        long failed = rows.stream().filter(r -> !"2".equals(String.valueOf(r.get("o_xstatus")))).count();
+
+        if (!rows.isEmpty() && failed == 0) {
+            lvs.setConfirmedFlag(1);
+            lvs.setUpdatedAt(LocalDateTime.now());
+            lvsHeaderRepository.save(lvs);
+            log.info("LVS CONFIRMED for {} — {} document(s)", tripCode, rows.size());
+        } else if (failed > 0) {
+            log.warn("LVS confirm partial failure for {} — {}/{} document(s) failed", tripCode, failed, rows.size());
+        } else {
+            // No table came back at all — fall back to treating the call
+            // itself succeeding as confirmation, same lenient handling
+            // used elsewhere in this codebase for responses that don't
+            // come back in the exact expected shape.
+            lvs.setConfirmedFlag(1);
+            lvs.setUpdatedAt(LocalDateTime.now());
+            lvsHeaderRepository.save(lvs);
+            log.info("LVS CONFIRMED for {} (no per-document detail in response)", tripCode);
+        }
+
+        return resp;
+    }
+
+    // ── LOAD TRUCK ────────────────────────────────────────────
+    // Calls X3's X10CSTKMTV for this trip's LVS, and only sets
+    // xr_lvsheader.load_flag = 1 once that succeeds. Blocks entirely if
+    // LVS Confirm hasn't succeeded yet — enforces the sequence server-
+    // side rather than relying on the UI to only show the button at the
+    // right time.
+    @Transactional
+    public Map<String, Object> loadTruck(String tripCode) {
+        LvsHeader lvs = lvsHeaderRepository.findByTripCode(tripCode)
+                .orElseThrow(() -> new RuntimeException("LVS not created yet for " + tripCode + " — complete LVS Create first."));
+
+        if (lvs.getConfirmedFlag() == null || lvs.getConfirmedFlag() == 0)
+            throw new RuntimeException("LVS must be confirmed before loading the truck: " + tripCode);
+
+        Map<String, Object> resp = x3SoapService.loadTruck(lvs.getLvsNumber());
+        if (resp != null && resp.get("error") != null) {
+            throw new RuntimeException("X3 load truck failed: " + resp.get("error"));
+        }
+
+        lvs.setLoadFlag(1);
+        lvs.setUpdatedAt(LocalDateTime.now());
+        lvsHeaderRepository.save(lvs);
+        log.info("TRUCK LOADED for {} (LVS {})", tripCode, lvs.getLvsNumber());
+
+        return resp;
+    }
+
+
     @Transactional
     public void lockTrips(List<String> tripCodes, String userCode) {
         tripCodes.forEach(c -> { try { lockTrip(c, userCode); } catch (Exception e) { log.error("lock {}: {}", c, e.getMessage()); }});
@@ -356,7 +443,8 @@ public class TripLockService {
         h.setArrivalTime(trip.getEndTime());
         h.setCapacityWeight(parseDoubleSafe(trip.getTotalWeight()));
         h.setTotalCases(computeTotalCases(trip));
-        h.setLoadFlag(1);
+        h.setConfirmedFlag(0);
+        h.setLoadFlag(0);
         h.setCreatedAt(now);
         h.setCreatedBy(usr);
         h.setUpdatedAt(now);

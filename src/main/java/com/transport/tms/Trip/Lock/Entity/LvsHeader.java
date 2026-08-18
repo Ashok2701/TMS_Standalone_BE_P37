@@ -61,7 +61,17 @@ public class LvsHeader {
     @Column(name = "total_cases")
     private Integer totalCases;
 
-    /** 1 = Generated (mirrors XLOADFLG_0's only value this project ever wrote). */
+    /** 1 once "LVS Confirm" has succeeded (XX10CRESDH) — set by
+     *  TripLockService.confirmLvs(), not at LVS creation time. */
+    @Column(name = "confirmed_flag")
+    private Integer confirmedFlag;
+
+    /** 1 once "Load Truck" has succeeded (X10CSTKMTV) — set by
+     *  TripLockService.loadTruck(), not at LVS creation time.
+     *  BUG FIX: this used to be hardcoded to 1 in writeLvsHeader() at
+     *  LVS *creation* time, which was wrong — it made every LVS look
+     *  "loaded" the instant it was created, before the truck was ever
+     *  actually loaded. */
     @Column(name = "load_flag")
     private Integer loadFlag;
 
