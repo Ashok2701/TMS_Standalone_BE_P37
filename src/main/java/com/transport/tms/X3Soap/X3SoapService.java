@@ -102,12 +102,6 @@ public class X3SoapService {
         return call("X10CCONBUT", inputXml);
     }
 
-    /** X1CONFIRM — Confirm route/trip in X3 (input: I_XNUMPC = VR/trip number) */
-    public Map<String, Object> confirmRoute(String vrNumber) {
-        String inputXml = "<PARAM><FLD NAME=\"I_XNUMPC\" TYPE=\"Char\">" + vrNumber + "</FLD></PARAM>";
-        return call("X1CONFIRM", inputXml);
-    }
-
     /** X10CSTKMTV — Load Truck: move stock onto the vehicle for an LVS (input: I_XLVSNUM = LVS number) */
     public Map<String, Object> loadTruck(String lvsNum) {
         String inputXml = "<PARAM><FLD NAME=\"I_XLVSNUM\" TYPE=\"Char\">" + lvsNum + "</FLD></PARAM>";
