@@ -83,15 +83,7 @@ public class X3SoapService {
      *  as an array under the lowercased TAB ID (e.g. "grp1"), so no
      *  special response handling is needed here. */
     public Map<String, Object> confirmDeliveries(List<String> docNums) {
-        StringBuilder lines = new StringBuilder();
-        for (int i = 0; i < docNums.size(); i++) {
-            lines.append("<LIN NUM=\"").append(i + 1).append("\">")
-                 .append("<FLD NAME=\"I_XPRHNUM\">").append(nz(docNums.get(i))).append("</FLD>")
-                 .append("</LIN>");
-        }
-        String inputXml = "<PARAM><TAB DIM=\"9999\" ID=\"GRP1\" SIZE=\"" + docNums.size() + "\">"
-            + lines + "</TAB></PARAM>";
-        return call("XX10CRESDH", inputXml);
+        return callPerDocument("XX10CRESDH", docNums);
     }
 
     private String nz(String s) { return s != null ? s : ""; }
@@ -103,9 +95,32 @@ public class X3SoapService {
     }
 
     /** X10CSTKMTV — Load Truck: move stock onto the vehicle for an LVS (input: I_XLVSNUM = LVS number) */
-    public Map<String, Object> loadTruck(String lvsNum) {
-        String inputXml = "<PARAM><FLD NAME=\"I_XLVSNUM\" TYPE=\"Char\">" + lvsNum + "</FLD></PARAM>";
-        return call("X10CSTKMTV", inputXml);
+    /** XX10CSTOLO — LVS Validate / Load Truck: allocates stock for a
+     *  batch of pick tickets. Replaces X10CSTKMTV (single I_XLVSNUM
+     *  call) — this one is per-document like XX10CRESDH/XX10CDOCRA.
+     *  Response uses O_XMSG (not O_XMESS, unlike XX10CRESDH). */
+    public Map<String, Object> validateStockLoad(List<String> docNums) {
+        return callPerDocument("XX10CSTOLO", docNums);
+    }
+
+    /** XX10CDOCRA — reverts a batch of pick tickets' status in X3, called
+     *  on Unlock. Response uses O_XMSG (not O_XMESS). */
+    public Map<String, Object> revertDocumentStatus(List<String> docNums) {
+        return callPerDocument("XX10CDOCRA", docNums);
+    }
+
+    /** Shared TAB/LIN builder for the "one row per document, I_XPRHNUM
+     *  only" family of calls (XX10CRESDH, XX10CSTOLO, XX10CDOCRA). */
+    private Map<String, Object> callPerDocument(String publicName, List<String> docNums) {
+        StringBuilder lines = new StringBuilder();
+        for (int i = 0; i < docNums.size(); i++) {
+            lines.append("<LIN NUM=\"").append(i + 1).append("\">")
+                 .append("<FLD NAME=\"I_XPRHNUM\">").append(nz(docNums.get(i))).append("</FLD>")
+                 .append("</LIN>");
+        }
+        String inputXml = "<PARAM><TAB DIM=\"9999\" ID=\"GRP1\" SIZE=\"" + docNums.size() + "\">"
+            + lines + "</TAB></PARAM>";
+        return call(publicName, inputXml);
     }
 
     /** XX10CVTLOC — Create/register a vehicle's location in X3

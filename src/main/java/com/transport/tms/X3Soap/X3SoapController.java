@@ -25,12 +25,6 @@ public class X3SoapController {
         return soapService.confirmLvs(lvsNum);
     }
 
-    /** Load Truck in X3 — X10CSTKMTV (input: I_XLVSNUM = LVS number) */
-    @PostMapping("/load-truck")
-    public Map<String, Object> loadTruck(@RequestParam String lvsNum) {
-        return soapService.loadTruck(lvsNum);
-    }
-
     /** Create/register a vehicle's location in X3 — XX10CVTLOC */
     @PostMapping("/vehicle-location")
     public Map<String, Object> createVehicleLocation(

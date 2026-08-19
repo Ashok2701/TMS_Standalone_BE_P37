@@ -132,11 +132,26 @@ public class TripLockService {
         if ("Validated".equals(trip.getOptiStatus()))
             throw new RuntimeException("Validated trips cannot be unlocked: " + tripCode);
 
-        // 1. Delete xr_vrheader + xr_vrdetails (Postgres)
+        // 1. XX10CDOCRA — revert every document's status in X3. Non-
+        //    blocking, same reasoning as updateDocumentsInX3 on Lock: an
+        //    X3-side rejection for one document (e.g. "Pickticket record
+        //    is not there") shouldn't prevent the trip from actually
+        //    unlocking on our own side.
+        try {
+            List<String> docNums = extractDocNums(trip);
+            if (!docNums.isEmpty()) {
+                Map<String, Object> resp = x3SoapService.revertDocumentStatus(docNums);
+                log.info("XX10CDOCRA for {}: {}", tripCode, resp);
+            }
+        } catch (Exception e) {
+            log.error("XX10CDOCRA failed for {}: {}", tripCode, e.getMessage());
+        }
+
+        // 2. Delete xr_vrheader + xr_vrdetails (Postgres)
         vrDetailRepository.deleteByTripCode(tripCode);
         vrHeaderRepository.findById(tripCode).ifPresent(vrHeaderRepository::delete);
 
-        // 2. Postgres — trip status itself
+        // 3. Postgres — trip status itself
         trip.setOptiStatus("Optimised");
         trip.setLockFlag(0);
         tripRepository.save(trip);
@@ -204,41 +219,43 @@ public class TripLockService {
     }
 
     // ── LOAD TRUCK ────────────────────────────────────────────
-    // Calls X3's X10CSTKMTV for this trip's LVS, and only sets
-    // xr_lvsheader.load_flag = 1 once that succeeds. Blocks entirely if
-    // LVS Confirm hasn't succeeded yet — enforces the sequence server-
-    // side rather than relying on the UI to only show the button at the
-    // right time.
+    // Calls X3's XX10CSTOLO for every document on the trip (replaces
+    // X10CSTKMTV, a single-LVS-number call), and only sets
+    // xr_lvsheader.load_flag = 1 if every document's stock allocation
+    // succeeds. Blocks entirely if LVS Confirm hasn't succeeded yet —
+    // enforces the sequence server-side rather than relying on the UI to
+    // only show the button at the right time.
     @Transactional
+    @SuppressWarnings("unchecked")
     public Map<String, Object> loadTruck(String tripCode) {
+        XrTrip trip = findTrip(tripCode);
         LvsHeader lvs = lvsHeaderRepository.findByTripCode(tripCode)
                 .orElseThrow(() -> new RuntimeException("LVS not created yet for " + tripCode + " — complete LVS Create first."));
 
         if (lvs.getConfirmedFlag() == null || lvs.getConfirmedFlag() == 0)
             throw new RuntimeException("LVS must be confirmed before loading the truck: " + tripCode);
 
-        Map<String, Object> resp = x3SoapService.loadTruck(lvs.getLvsNumber());
+        List<String> docNums = extractDocNums(trip);
+        if (docNums.isEmpty())
+            throw new RuntimeException("Trip has no documents to load: " + tripCode);
+
+        Map<String, Object> resp = x3SoapService.validateStockLoad(docNums);
         if (resp != null && resp.get("error") != null) {
             throw new RuntimeException("X3 load truck failed: " + resp.get("error"));
         }
 
-        // BUG FIX: this used to only check for a transport-level error
-        // (resp.get("error"), set only if the SOAP call itself threw) —
-        // it never looked at X3's own business-level o_xstatus/o_xmess
-        // at all, so a genuine business rejection from X3 (a real
-        // non-success status, not an "already loaded" idempotent case)
-        // would have been silently treated as success and load_flag set
-        // anyway. Now actually checks the response, same isX3Success()
-        // rule as confirmLvs — status "2", OR a message indicating the
-        // truck/LVS was already loaded, both count as success.
-        if (resp != null && resp.containsKey("o_xstatus") && !isX3Success(resp.get("o_xstatus"), resp.get("o_xmess"))) {
-            throw new RuntimeException("X3 load truck failed: " + resp.get("o_xmess"));
+        List<Map<String, Object>> rows = resp != null ? (List<Map<String, Object>>) resp.getOrDefault("grp1", List.of()) : List.of();
+        long failed = rows.stream().filter(r -> !isX3Success(r.get("o_xstatus"), r.get("o_xmsg"))).count();
+
+        if (!rows.isEmpty() && failed > 0) {
+            log.warn("Load truck partial failure for {} — {}/{} document(s) failed", tripCode, failed, rows.size());
+            throw new RuntimeException("X3 load truck failed for " + failed + "/" + rows.size() + " document(s)");
         }
 
         lvs.setLoadFlag(1);
         lvs.setUpdatedAt(LocalDateTime.now());
         lvsHeaderRepository.save(lvs);
-        log.info("TRUCK LOADED for {} (LVS {})", tripCode, lvs.getLvsNumber());
+        log.info("TRUCK LOADED for {} (LVS {}) — {} document(s)", tripCode, lvs.getLvsNumber(), rows.size());
 
         return resp;
     }
@@ -563,5 +580,27 @@ public class TripLockService {
     private String getString(Map<String, Object> m, String... keys) {
         for (String k : keys) { Object v = m.get(k); if (v != null) return v.toString(); }
         return null;
+    }
+
+    /** Every document/stop number on a trip — shared by
+     *  updateDocumentsInX3, confirmLvs, loadTruck, and unlockTrip, which
+     *  all need the same "which documents are on this trip" list. */
+    @SuppressWarnings("unchecked")
+    private List<String> extractDocNums(XrTrip trip) {
+        if (trip.getStopObjectsJson() == null || trip.getStopObjectsJson().isBlank()) return List.of();
+        List<Map<String, Object>> stops;
+        try {
+            stops = objectMapper.readValue(trip.getStopObjectsJson(),
+                objectMapper.getTypeFactory().constructCollectionType(List.class, Map.class));
+        } catch (Exception e) {
+            log.error("Cannot parse stops for {}: {}", trip.getTripCode(), e.getMessage());
+            return List.of();
+        }
+        List<String> docNums = new ArrayList<>();
+        for (Map<String, Object> s : stops) {
+            String docNum = getString(s, "txn", "docNum", "id");
+            if (docNum != null) docNums.add(docNum);
+        }
+        return docNums;
     }
 }
