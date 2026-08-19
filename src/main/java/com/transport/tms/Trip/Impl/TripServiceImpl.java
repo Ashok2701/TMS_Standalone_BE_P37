@@ -145,6 +145,24 @@ public class TripServiceImpl implements TripService {
     public TripResponseDTO optimiseTrip(String tripCode, OptimisationRequestDTO req) {
         XrTrip trip = findOrThrow(tripCode);
 
+        // BUG FIX: this used to unconditionally set optiStatus back to
+        // "Optimised" regardless of the trip's current status — if
+        // Optimise ever ran again on a trip that was already Locked or
+        // Validated (e.g. re-running Auto Trip Generation for the same
+        // site/date), it silently reverted the trip's displayed status
+        // while leaving xr_vrheader/xr_vrdetails/xr_lvsheader (created
+        // during that earlier Lock/Validate cycle) completely orphaned —
+        // a real LVS record sitting there for a trip whose own status
+        // claimed it had never even been locked. Blocking here forces
+        // an explicit Unlock first, which now correctly cleans up that
+        // downstream data (see TripLockService.unlockTrip()), before
+        // the trip can be re-optimised.
+        String currentStatus = trip.getOptiStatus();
+        if ("Locked".equals(currentStatus) || "Validated".equals(currentStatus)) {
+            throw new RuntimeException(
+                    "Trip " + tripCode + " is already " + currentStatus + " — unlock it first before re-optimising.");
+        }
+
         // ── Status & settings ─────────────────────────────────
         trip.setOptiStatus("Optimised");
         trip.setHeuExec(req.getOrderMode() != null ? req.getOrderMode() : "fixed");
