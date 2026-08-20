@@ -4,6 +4,7 @@ import com.transport.tms.Trip.Dto.TripRequestDTO;
 import com.transport.tms.Trip.Dto.TripResponseDTO;
 import com.transport.tms.Trip.Dto.TripStatusDTO;
 import com.transport.tms.Trip.Entity.XrTrip;
+import com.transport.tms.Trip.Lock.TripLockService;
 import com.transport.tms.Trip.Repository.TripRepository;
 import com.transport.tms.Trip.Service.TripService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -158,7 +159,7 @@ public class TripServiceImpl implements TripService {
         // downstream data (see TripLockService.unlockTrip()), before
         // the trip can be re-optimised.
         String currentStatus = trip.getOptiStatus();
-        if ("Locked".equals(currentStatus) || "Validated".equals(currentStatus)) {
+        if ("Locked".equals(currentStatus) || TripLockService.isAtLeastToAllocate(currentStatus)) {
             throw new RuntimeException(
                     "Trip " + tripCode + " is already " + currentStatus + " — unlock it first before re-optimising.");
         }

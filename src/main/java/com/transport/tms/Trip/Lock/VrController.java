@@ -144,7 +144,8 @@ public class VrController {
             row.put("waittime", d.getWaitingTime());
             row.put("optista", 1);
             row.put("xloaded", 0);
-            row.put("xdlvstatus", 1);
+            row.put("xdlvstatus", d.getDocStatus() != null ? d.getDocStatus() : "Scheduled");
+            row.put("docStatus", d.getDocStatus() != null ? d.getDocStatus() : "Scheduled");
             row.put("xdocsite", d.getSite());
             row.put("xacteta", d.getArrivalTime());
             row.put("xactetd", d.getDepartureTime());

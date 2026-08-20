@@ -68,6 +68,14 @@ public class VrDetail {
     @Column(name = "pickup_drop")
     private Integer pickupDrop;
 
+    /** LVS document status: Scheduled (default) -> In Progress (mobile
+     *  app "Confirm Arrival") -> Delivered (mobile app "Departure").
+     *  Only the default is set anywhere in this codebase yet — the two
+     *  transitions depend on mobile-app services (Confirm Arrival,
+     *  Departure) that haven't been built. */
+    @Column(name = "doc_status")
+    private String docStatus;
+
     @Column(name = "site")
     private String site;
 

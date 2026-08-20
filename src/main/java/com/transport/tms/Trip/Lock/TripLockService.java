@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Lock / Validate / Unlock. As of this version, XX10CPLANCHA/XX10CPLANCHD/
@@ -120,17 +121,17 @@ public class TripLockService {
         updateDocStatusOnValidate(trip, x3);
 
         // 3. Postgres — trip status itself
-        trip.setOptiStatus("Validated");
+        trip.setOptiStatus("To Allocate");
         tripRepository.save(trip);
-        log.info("VALIDATED {}", tripCode);
+        log.info("VALIDATED (To Allocate) {}", tripCode);
     }
 
     // ── UNLOCK ────────────────────────────────────────────────
     @Transactional
     public void unlockTrip(String tripCode, String userCode) {
         XrTrip trip = findTrip(tripCode);
-        if ("Validated".equals(trip.getOptiStatus()))
-            throw new RuntimeException("Validated trips cannot be unlocked: " + tripCode);
+        if (isAtLeastToAllocate(trip.getOptiStatus()))
+            throw new RuntimeException(trip.getOptiStatus() + " trips cannot be unlocked: " + tripCode);
 
         // 1. XX10CDOCRA — revert every document's status in X3. Non-
         //    blocking, same reasoning as updateDocumentsInX3 on Lock: an
@@ -201,6 +202,8 @@ public class TripLockService {
             lvs.setConfirmedFlag(1);
             lvs.setUpdatedAt(LocalDateTime.now());
             lvsHeaderRepository.save(lvs);
+            trip.setOptiStatus("Confirmed");
+            tripRepository.save(trip);
             log.info("LVS CONFIRMED for {} — {} document(s)", tripCode, rows.size());
         } else if (failed > 0) {
             log.warn("LVS confirm partial failure for {} — {}/{} document(s) failed", tripCode, failed, rows.size());
@@ -212,6 +215,8 @@ public class TripLockService {
             lvs.setConfirmedFlag(1);
             lvs.setUpdatedAt(LocalDateTime.now());
             lvsHeaderRepository.save(lvs);
+            trip.setOptiStatus("Confirmed");
+            tripRepository.save(trip);
             log.info("LVS CONFIRMED for {} (no per-document detail in response)", tripCode);
         }
 
@@ -255,6 +260,8 @@ public class TripLockService {
         lvs.setLoadFlag(1);
         lvs.setUpdatedAt(LocalDateTime.now());
         lvsHeaderRepository.save(lvs);
+        trip.setOptiStatus("Loaded");
+        tripRepository.save(trip);
         log.info("TRUCK LOADED for {} (LVS {}) — {} document(s)", tripCode, lvs.getLvsNumber(), rows.size());
 
         return resp;
@@ -271,6 +278,19 @@ public class TripLockService {
         if ("2".equals(String.valueOf(status))) return true;
         String msg = message != null ? String.valueOf(message).toLowerCase() : "";
         return msg.contains("already");
+    }
+
+    // Full trip status lifecycle, in order:
+    //   Open -> Optimised -> Locked -> To Allocate (LVS Create) ->
+    //   Confirmed (LVS Confirm) -> Loaded (Load Truck) ->
+    //   Checked-In -> Checked-Out (mobile app, not yet wired to any
+    //   transition here — no backend service exists yet to set these).
+    // True once a trip has an LVS record (i.e. from "To Allocate"
+    // onward) — used to block actions (Unlock, re-Optimise) that would
+    // orphan xr_vrheader/xr_vrdetails/xr_lvsheader if allowed past this
+    // point without going through a proper Unlock first.
+    public static boolean isAtLeastToAllocate(String status) {
+        return status != null && Set.of("To Allocate", "Confirmed", "Loaded", "Checked-In", "Checked-Out").contains(status);
     }
 
 
@@ -373,6 +393,7 @@ public class TripLockService {
                 // "DROP" for both, docType reliably distinguishes them).
                 d.setPickupDrop(isPickTicket(s) ? 2 : 1);
                 d.setDocTypeCode(isPickTicket(s) ? 4 : 1);
+                d.setDocStatus("Scheduled");
                 d.setSite(trip.getSite());
                 d.setCreatedAt(now);
                 d.setUpdatedAt(now);
